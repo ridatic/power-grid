@@ -172,7 +172,6 @@ export function ColorsPanel(p: PanelProps) {
   const [busy, setBusy] = useState(false)
   const pick = (id: string, colors: string[]) => {
     set({ paletteId: id, colors })
-    p.notify(tr('Palette appliquée', 'Palette applied'))
   }
   const groups = by === 'industry' ? INDUSTRIES : by === 'feeling' ? FEELINGS : TONES
   const list = all ? PALETTES.filter((x) => val === 'all' || x[by] === val) : PALETTES.filter((x) => SUGGESTED.includes(x.id))
@@ -454,9 +453,10 @@ export function MediaPanel(p: PanelProps) {
   const [set, setSet] = useState('general')
   const isMenu = p.project.pages[p.project.active].kind === 'menu'
 
+  const reload = () => p.store.listMedia().then(setMedia).catch(() => setMedia([]))
   useEffect(() => {
-    p.store.listMedia().then(setMedia).catch(() => setMedia([]))
-  }, [p.store])
+    void reload()
+  }, [p.store]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -464,7 +464,7 @@ export function MediaPanel(p: PanelProps) {
       {isMenu && <p className="panel-note">{tr('Sélectionnez une page de contenu pour y ajouter des médias.', 'Select a content page to add media.')}</p>}
       <Group title={tr('Mes images', 'My images')} />
       <div className="media-mini">
-        <button className="media-add" disabled={isMenu} onClick={() => p.onMedia('image', (pick) => (pick.kind === 'image' ? p.onInsert('image', { src: pick.src, fit: 'contain' }) : p.onInsert('icon', { icon: pick.name })))}>
+        <button className="media-add" disabled={isMenu} onClick={() => p.onMedia('image', (pick) => { void reload(); return pick.kind === 'image' ? p.onInsert('image', { src: pick.src, fit: 'contain' }) : p.onInsert('icon', { icon: pick.name }) })}>
           <Icon name="upload" size={18} />
           <span>{tr('Importer ou parcourir', 'Import or browse')}</span>
         </button>

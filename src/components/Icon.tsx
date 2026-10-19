@@ -11,6 +11,8 @@ const paths = {
   pencil: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
   trash: 'M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V3h6v3',
   copy: 'M9 9h11v11H9zM5 15V5h10',
+  grid: 'M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18',
+  target: 'M12 2v4M12 18v4M2 12h4M18 12h4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
   logout: 'M9 21H5V3h4M16 17l5-5-5-5M21 12H9',
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
   undo: 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',

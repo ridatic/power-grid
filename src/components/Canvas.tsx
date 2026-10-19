@@ -21,6 +21,8 @@ interface Props {
   onMove: (id: string, box: Box) => void
   onAdd: (type: ElementType) => void
   toolbar: ReactNode
+  /** Actions du document (favori, enregistrer comme modele, dupliquer), a cote du bouton Ajouter. */
+  tools?: ReactNode
 }
 
 type Edge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
@@ -58,6 +60,10 @@ interface Drag {
 }
 
 const PAD = 28
+/** Hauteur reservee a la barre d'outils, pour qu'elle ne recouvre jamais la page. */
+const TOOLS_H = 52
+/** Paliers du zoom (1 = taille reelle de la page). */
+const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2]
 const ADDABLE: ElementType[] = ['kpi', 'chart', 'table', 'slicer', 'map', 'text', 'image', 'icon']
 
 /**
@@ -65,30 +71,67 @@ const ADDABLE: ElementType[] = ['kpi', 'chart', 'table', 'slicer', 'map', 'text'
  * Un clic sur la navigation ou le titre ouvre leurs reglages ; un visuel se selectionne, se deplace et se redimensionne
  * en restant aimante a la grille.
  */
-export function Canvas({ project, t, lang, selectedId, guides, slots, onSelect, onOpenTab, onMove, onAdd, toolbar }: Props) {
+export function Canvas({ project, t, lang, selectedId, guides, slots, onSelect, onOpenTab, onMove, onAdd, toolbar, tools }: Props) {
   const { cfg } = project
   const page = project.pages[project.active]
   const stageRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const pageRef = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(0.5)
+  const [fitScale, setFitScale] = useState(0.5)
+  // Zoom choisi ; null = la page tient entierement dans la zone
+  const [zoom, setZoom] = useState<number | null>(null)
+  const scale = zoom ?? fitScale
   const [drag, setDrag] = useState<Drag | null>(null)
   const dragRef = useRef<Drag | null>(null)
   const [adding, setAdding] = useState(false)
   const tr = (fr: string, en: string) => (lang === 'fr' ? fr : en)
 
   useEffect(() => {
-    const el = stageRef.current
+    const el = scrollRef.current
     if (!el) return
     const fit = () => {
       const w = el.clientWidth - PAD * 2
-      const h = el.clientHeight - PAD * 2 - 24
-      if (w > 0 && h > 0) setScale(Math.min(w / cfg.width, h / cfg.height))
+      const h = el.clientHeight - PAD * 2 - 24 - TOOLS_H
+      if (w > 0 && h > 0) setFitScale(Math.min(w / cfg.width, h / cfg.height))
     }
     fit()
     const ro = new ResizeObserver(fit)
     ro.observe(el)
     return () => ro.disconnect()
   }, [cfg.width, cfg.height])
+
+  // Le zoom part de l'echelle courante ; lue par reference pour la molette et le clavier
+  const fitRef = useRef(fitScale)
+  useEffect(() => {
+    fitRef.current = fitScale
+  }, [fitScale])
+  const zoomStep = (dir: 1 | -1) =>
+    setZoom((z) => {
+      const cur = z ?? fitRef.current
+      const next = dir > 0 ? ZOOMS.find((v) => v > cur + 0.001) : [...ZOOMS].reverse().find((v) => v < cur - 0.001)
+      return next ?? cur
+    })
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      zoomStep(e.deltaY < 0 ? 1 : -1)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || (e.target as HTMLElement).closest?.('input, textarea, select')) return
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomStep(1) }
+      else if (e.key === '-') { e.preventDefault(); zoomStep(-1) }
+      else if (e.key === '0') { e.preventDefault(); setZoom(null) }
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    window.addEventListener('keydown', onKey)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const showGuides = guides || !!drag?.moved
   const colors = useMemo(() => resolveColors(cfg), [cfg])
@@ -176,20 +219,25 @@ export function Canvas({ project, t, lang, selectedId, guides, slots, onSelect, 
 
   return (
     <div className={`stage${drag?.moved ? ' dragging' : ''}`} ref={stageRef} onPointerDown={(e) => e.target === e.currentTarget && onSelect(null)}>
-      {!isMenu && (
-        <div className="add-wrap">
-          <button className="add-btn" aria-expanded={adding} onClick={() => setAdding(!adding)}>
-            <span aria-hidden="true">+</span> {tr('Ajouter', 'Add')}
-          </button>
-          {adding && (
-            <div className="add-menu" onPointerLeave={() => setAdding(false)}>
-              {ADDABLE.map((type) => (
-                <button key={type} onClick={() => { onAdd(type); setAdding(false) }}>{t.types[type]}</button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <div className="canvas-tools">
+        {!isMenu && (
+          <div className="add-wrap">
+            <button className="tool-btn add" aria-expanded={adding} onClick={() => setAdding(!adding)} title={tr('Ajouter un élément sur la page', 'Add an element to the page')} aria-label={tr('Ajouter un élément', 'Add an element')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+            </button>
+            {adding && (
+              <div className="add-menu" onPointerLeave={() => setAdding(false)}>
+                {ADDABLE.map((type) => (
+                  <button key={type} onClick={() => { onAdd(type); setAdding(false) }}>{t.types[type]}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {tools && <span className="tools-sep" />}
+        {tools}
+      </div>
+      <div className="stage-scroll" ref={scrollRef} onPointerDown={(e) => e.target === e.currentTarget && onSelect(null)}>
       <div className="page-wrap" style={{ width: cfg.width * scale, height: cfg.height * scale }}>
         <div className="page" ref={pageRef}>
           <div
@@ -247,6 +295,15 @@ export function Canvas({ project, t, lang, selectedId, guides, slots, onSelect, 
             {toolbar}
           </div>
         )}
+      </div>
+      </div>
+      <div className="zoom-box" role="group" aria-label={tr('Zoom', 'Zoom')}>
+        <button onClick={() => zoomStep(-1)} title={tr('Réduire (Ctrl -)', 'Zoom out (Ctrl -)')} aria-label={tr('Réduire', 'Zoom out')}>−</button>
+        <button className="zoom-val" onClick={() => setZoom(zoom === null ? 1 : null)} title={zoom === null ? tr('Taille réelle (100 %)', 'Actual size (100%)') : tr('Ajuster à la zone (Ctrl 0)', 'Fit to area (Ctrl 0)')}>{Math.round(scale * 100)} %</button>
+        <button onClick={() => zoomStep(1)} title={tr('Agrandir (Ctrl +)', 'Zoom in (Ctrl +)')} aria-label={tr('Agrandir', 'Zoom in')}>+</button>
+        <button className={`zoom-fit${zoom === null ? ' on' : ''}`} onClick={() => setZoom(null)} title={tr('Ajuster à la zone (Ctrl 0)', 'Fit to area (Ctrl 0)')} aria-label={tr('Ajuster à la zone', 'Fit to area')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+        </button>
       </div>
     </div>
   )

@@ -6,14 +6,16 @@ import { buildPage } from '../core/svg'
 import { normalizeProject } from '../store'
 import { ElementView } from './ElementView'
 
-/** Apercu reduit et fidele de la premiere page : le fond et le contenu des visuels, comme dans l'editeur. */
+/** Apercu reduit et fidele de la page affichee au dernier enregistrement : le fond et le contenu des visuels, comme dans l'editeur. */
 export function PagePreview({ project }: { project: Project }) {
   const ref = useRef<HTMLSpanElement>(null)
   const [scale, setScale] = useState(0)
   const p = useMemo(() => normalizeProject(project), [project])
   const { cfg } = p
-  const page = p.pages[0]
-  const svg = useMemo(() => buildPage(cfg, p.pages, 0).svg, [cfg, p.pages])
+  // La page affichee au dernier enregistrement : la vignette montre ce qui vient d'etre modifie
+  const index = Math.min(Math.max(0, p.active), p.pages.length - 1)
+  const page = p.pages[index]
+  const svg = useMemo(() => buildPage(cfg, p.pages, index).svg, [cfg, p.pages, index])
   const colors = useMemo(() => resolveColors(cfg), [cfg])
 
   useEffect(() => {

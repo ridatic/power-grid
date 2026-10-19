@@ -52,7 +52,7 @@ export function HeaderActions({ lang, onLang, uiTheme, onUiTheme, account, onPro
                 <span>{account.email}</span>
               </div>
               <button className="account-item" onClick={() => { setMenu(false); onProfile() }}><Icon name="user" size={14} /> {tr('Mon profil', 'My profile')}</button>
-              <button className="account-item" onClick={() => { setMenu(false); onHome() }}><Icon name="file" size={14} /><span><b>{tr('Mes fichiers', 'My files')}</b><small>{tr('Vos rapports en cours', 'Your reports in progress')}</small></span></button>
+              <button className="account-item" onClick={() => { setMenu(false); onHome() }}><Icon name="file" size={14} /><span><b>{tr('Accueil', 'Home')}</b><small>{tr('Récents, favoris, modèles', 'Recent, favorites, models')}</small></span></button>
               <button className="account-item" onClick={() => { setMenu(false); onModels() }}><Icon name="layout" size={14} /><span><b>{tr('Mes modèles', 'My models')}</b><small>{tr('Vos points de départ réutilisables', 'Your reusable starting points')}</small></span></button>
               <button className="account-item" onClick={() => { setMenu(false); onSettings() }}><Icon name="settings" size={14} /> {tr('Paramètres', 'Settings')}</button>
               <button className="account-item" onClick={() => { setMenu(false); onSignOut() }}><Icon name="logout" size={14} /> {tr('Se déconnecter', 'Sign out')}</button>

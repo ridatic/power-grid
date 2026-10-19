@@ -1,7 +1,7 @@
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 
-/** Informations du compte, reprises dans les nouveaux fichiers (nom et fonction dans la navigation, entreprise, photo). */
+/** Informations du compte, reprises dans un nouveau modele (nom et fonction dans la navigation, entreprise, photo). */
 export interface AccountProfile {
   name: string
   role: string

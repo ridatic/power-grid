@@ -50,15 +50,15 @@ export function loadPanel(): PanelPref {
 
 /** Parametres de l'application (gardes dans ce navigateur). */
 export interface AppSettings {
-  autosave: boolean // fichiers enregistres automatiquement
+  autosave: boolean // modele enregistre automatiquement (sinon bouton Enregistrer)
   showGrid: boolean // grille affichee a l'ouverture de l'editeur
   showSlots: boolean // emplacements Power BI affiches a l'ouverture
-  newSize: string // taille des nouveaux fichiers vierges, ex. 1440x900
-  newPalette: string // palette des nouveaux fichiers vierges
-  newFont: string // police des nouveaux fichiers vierges
+  newSize: string // taille d'une page vierge, ex. 1440x900
+  newPalette: string // palette d'une page vierge
+  newFont: string // police d'une page vierge
 }
 
-export const DEFAULT_SETTINGS: AppSettings = { autosave: true, showGrid: false, showSlots: false, newSize: '1440x900', newPalette: 'ember', newFont: 'Segoe UI' }
+export const DEFAULT_SETTINGS: AppSettings = { autosave: false, showGrid: false, showSlots: false, newSize: '1440x900', newPalette: 'ember', newFont: 'Segoe UI' }
 
 export function loadSettings(): AppSettings {
   try {

@@ -8,16 +8,12 @@ interface Props {
   project: Project
   dispatch: (a: Action) => void
   lang: Lang
-  guides: boolean
-  slots: boolean
-  onGuides: (v: boolean) => void
-  onSlots: (v: boolean) => void
   onPage: (index: number) => void
   onRemovePage: (index: number) => void
 }
 
 /** Onglets de pages en bas de l'apercu, comme dans Power BI. */
-export function PageBar({ project, dispatch, lang, guides, slots, onGuides, onSlots, onPage, onRemovePage }: Props) {
+export function PageBar({ project, dispatch, lang, onPage, onRemovePage }: Props) {
   const [renaming, setRenaming] = useState<number | null>(null)
   const [adding, setAdding] = useState(false)
   const tr = (fr: string, en: string) => (lang === 'fr' ? fr : en)
@@ -69,9 +65,6 @@ export function PageBar({ project, dispatch, lang, guides, slots, onGuides, onSl
         )}
       </div>
       <div className="pagebar-right">
-        <button className={`toggle-txt${guides ? ' on' : ''}`} aria-pressed={guides} onClick={() => onGuides(!guides)}>{tr('Grille', 'Grid')}</button>
-        <button className={`toggle-txt${slots ? ' on' : ''}`} aria-pressed={slots} onClick={() => onSlots(!slots)} title={tr('Montre où poser les boutons et visuels dans Power BI', 'Shows where to place buttons and visuals in Power BI')}>{tr('Emplacements', 'Slots')}</button>
-        <span className="sep" />
         <span className="muted">{project.cfg.width} × {project.cfg.height}</span>
       </div>
     </div>

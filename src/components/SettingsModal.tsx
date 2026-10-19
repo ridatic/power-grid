@@ -20,7 +20,7 @@ interface Props {
   onClose: () => void
 }
 
-/** Parametres de l'application : interface, editeur, nouveaux fichiers, donnees. */
+/** Parametres de l'application : interface, editeur, pages vierges, donnees. */
 export function SettingsModal({ lang, onLang, uiTheme, onUiTheme, settings, onSettings, store, onClose }: Props) {
   const fb = useFeedback()
   const tr = (fr: string, en: string) => (lang === 'fr' ? fr : en)
@@ -35,7 +35,7 @@ export function SettingsModal({ lang, onLang, uiTheme, onUiTheme, settings, onSe
   const clearLocal = async () => {
     const ok = await fb.confirm({
       title: tr('Effacer les données de ce navigateur ?', 'Clear this browser data?'),
-      message: tr('Les fichiers, modèles et images gardés sans compte sur cet appareil, ainsi que vos préférences, sont supprimés. Les données de votre compte ne sont pas touchées.', 'Files, models and images kept without an account on this device, and your preferences, are deleted. Your account data is not touched.'),
+      message: tr('Les modèles, favoris et images gardés sans compte sur cet appareil, ainsi que vos préférences, sont supprimés. Les données de votre compte ne sont pas touchées.', 'Models, favorites and images kept without an account on this device, and your preferences, are deleted. Your account data is not touched.'),
       confirmLabel: tr('Effacer', 'Clear'),
       danger: true,
     })
@@ -67,14 +67,14 @@ export function SettingsModal({ lang, onLang, uiTheme, onUiTheme, settings, onSe
 
           <section>
             <h3>{tr('Éditeur', 'Editor')}</h3>
-            <Switch id="set-autosave" checked={settings.autosave} onChange={(autosave) => set({ autosave })} label={tr('Enregistrer les fichiers automatiquement (une seconde après chaque modification)', 'Save files automatically (one second after each change)')} />
-            <p className="hint">{tr('Les modèles ne s\'enregistrent jamais seuls : l\'application vous demande avant de quitter un modèle modifié.', 'Models never save on their own: the app asks you before leaving a changed model.')}</p>
+            <Switch id="set-autosave" checked={settings.autosave} onChange={(autosave) => set({ autosave })} label={tr('Enregistrer automatiquement (une seconde après chaque modification)', 'Save automatically (one second after each change)')} />
+            <p className="hint">{tr('Désactivé : utilisez le bouton « Enregistrer » (Ctrl S). Dans tous les cas, l\'application vous prévient avant de quitter des modifications non enregistrées.', 'Off: use the "Save" button (Ctrl S). Either way, the app warns you before leaving unsaved changes.')}</p>
             <Switch id="set-grid" checked={settings.showGrid} onChange={(showGrid) => set({ showGrid })} label={tr('Afficher la grille à l\'ouverture', 'Show the grid when opening')} />
             <Switch id="set-slots" checked={settings.showSlots} onChange={(showSlots) => set({ showSlots })} label={tr('Afficher les emplacements Power BI à l\'ouverture', 'Show Power BI slots when opening')} />
           </section>
 
           <section>
-            <h3>{tr('Nouveaux fichiers vierges', 'New blank files')}</h3>
+            <h3>{tr('Pages vierges', 'Blank pages')}</h3>
             <div className="set-row">
               <div><b>{tr('Taille de la page', 'Page size')}</b></div>
               <select value={settings.newSize} onChange={(e) => set({ newSize: e.target.value })}>{SIZES.map((z) => <option key={z} value={z}>{z.replace('x', ' × ')}</option>)}</select>
@@ -93,13 +93,13 @@ export function SettingsModal({ lang, onLang, uiTheme, onUiTheme, settings, onSe
             <h3>{tr('Données', 'Data')}</h3>
             <div className="set-row">
               <div>
-                <b>{tr('Emplacement de vos fichiers', 'Where your files are kept')}</b>
+                <b>{tr('Où sont gardés vos modèles', 'Where your models are kept')}</b>
                 <small>{store.kind === 'cloud' ? tr('Dans votre compte : disponibles sur tous vos appareils.', 'In your account: available on all your devices.') : tr('Dans ce navigateur seulement (sans compte).', 'In this browser only (no account).')}</small>
               </div>
               <span className="tag">{store.kind === 'cloud' ? tr('Compte', 'Account') : tr('Cet appareil', 'This device')}</span>
             </div>
             <div className="set-row">
-              <div><b>{tr('Données de ce navigateur', 'This browser data')}</b><small>{tr('Préférences, et fichiers gardés sans compte.', 'Preferences, and files kept without an account.')}</small></div>
+              <div><b>{tr('Données de ce navigateur', 'This browser data')}</b><small>{tr('Préférences, et modèles gardés sans compte.', 'Preferences, and models kept without an account.')}</small></div>
               <button className="btn danger-outline" onClick={() => void clearLocal()}>{tr('Effacer', 'Clear')}</button>
             </div>
           </section>

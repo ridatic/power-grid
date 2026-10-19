@@ -3,7 +3,8 @@ import './App.css'
 import { useSession, signOut } from './auth'
 import { accountOf } from './account'
 import { supabase } from './lib/supabase'
-import { modelStore, type SavedModel } from './storage'
+import { listDocs, markOpened, modelStore, uniqueName, type SavedModel } from './storage'
+import type { Project } from './core/types'
 import { useFeedback } from './feedback'
 import { AuthPage } from './components/AuthPage'
 import { Home } from './components/Home'
@@ -37,7 +38,7 @@ export default function App() {
   )
 }
 
-/** Connexion obligatoire, puis accueil (fichiers et modeles) ou editeur. Le document ouvert est garde dans l'adresse. */
+/** Connexion obligatoire, puis accueil (recents, favoris, modeles) ou editeur. Le modele ouvert est garde dans l'adresse. */
 function Shell({ lang, onLang, uiTheme, onUiTheme }: { lang: Lang; onLang: (l: Lang) => void; uiTheme: UiTheme; onUiTheme: (t: UiTheme) => void }) {
   const fb = useFeedback()
   const { session, loading } = useSession()
@@ -64,6 +65,7 @@ function Shell({ lang, onLang, uiTheme, onUiTheme }: { lang: Lang; onLang: (l: L
   const ready = !loading && (signedIn || (local && !supabase))
 
   const openDoc = (d: SavedModel) => {
+    markOpened(store, d.id).catch((e: unknown) => console.error(e))
     setOpen(d)
     window.history.replaceState(null, '', `#/doc/${d.id}`)
   }
@@ -86,12 +88,14 @@ function Shell({ lang, onLang, uiTheme, onUiTheme }: { lang: Lang; onLang: (l: L
       .finally(() => setRestoring(false))
   }, [ready, restoring, store])
 
-  const newFileFrom = async (m: SavedModel) => {
+  /** Partir d'un modele (predefini ou a soi) ou d'une page vierge : un nouveau document dans les recents, ouvert aussitot. */
+  const startFrom = async (name: string, data: Project) => {
     try {
-      openDoc(await store.create('file', m.name, m.data))
+      const finalName = uniqueName(name, await listDocs(store))
+      openDoc(await store.create('file', finalName, data))
     } catch (e) {
       console.error(e)
-      fb.toast(tr('Le fichier n\'a pas pu être créé.', 'The file could not be created.'), 'error')
+      fb.toast(tr('Le document n\'a pas pu être créé. Réessayez.', 'The document could not be created. Try again.'), 'error')
     }
   }
 
@@ -113,10 +117,9 @@ function Shell({ lang, onLang, uiTheme, onUiTheme }: { lang: Lang; onLang: (l: L
           key={open.id}
           initial={open.data}
           name={open.name}
-          kind={open.kind}
           onSave={(project, name) => store.save(open.id, name, project)}
           store={store}
-          onNewFileFrom={(m) => void newFileFrom(m)}
+          onOpenDoc={openDoc}
           onBack={back}
           lang={lang}
           onLang={onLang}
@@ -128,9 +131,10 @@ function Shell({ lang, onLang, uiTheme, onUiTheme }: { lang: Lang; onLang: (l: L
           settings={settings}
           onSettings={() => setSettingsOpen(true)}
           docId={open.id}
+          kind={open.kind}
         />
       ) : (
-        <Home lang={lang} onLang={onLang} uiTheme={uiTheme} onUiTheme={onUiTheme} store={store} account={account} onProfile={() => setProfile(true)} onSignOut={leave} onOpen={openDoc} settings={settings} onSettings={() => setSettingsOpen(true)} />
+        <Home lang={lang} onLang={onLang} uiTheme={uiTheme} onUiTheme={onUiTheme} store={store} account={account} onProfile={() => setProfile(true)} onSignOut={leave} onOpen={openDoc} onStart={(n, d) => void startFrom(n, d)} settings={settings} onSettings={() => setSettingsOpen(true)} />
       )}
       {settingsOpen && <SettingsModal lang={lang} onLang={onLang} uiTheme={uiTheme} onUiTheme={onUiTheme} settings={settings} onSettings={setSettings} store={store} onClose={() => setSettingsOpen(false)} />}
       {profile && account && <ProfileModal lang={lang} account={account} store={store} onClose={() => setProfile(false)} notify={(m) => fb.toast(m)} />}

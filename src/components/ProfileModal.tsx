@@ -16,7 +16,7 @@ interface Props {
 }
 
 /**
- * Profil, comme Sira mais pour Power-Grid : les informations reprises dans les nouveaux fichiers,
+ * Profil, comme Sira mais pour Power-Grid : les informations reprises dans un nouveau modele,
  * le mot de passe, l'export de toutes les donnees et la demande de suppression du compte.
  */
 export function ProfileModal({ lang, account, store, onClose, notify }: Props) {
@@ -104,7 +104,7 @@ export function ProfileModal({ lang, account, store, onClose, notify }: Props) {
                   <div className="photo-preview">{form.photo ? <img src={form.photo} alt="" /> : initialsOf(form.name)}</div>
                   <div>
                     <b>{tr('Photo de profil', 'Profile photo')}</b>
-                    <p>{tr('Affichée dans l\'en-tête et proposée pour l\'avatar des nouveaux fichiers.', 'Shown in the header and used for the avatar of new files.')}</p>
+                    <p>{tr('Affichée dans l\'en-tête et reprise pour l\'avatar d\'un nouveau modèle.', 'Shown in the header and used for the avatar of a new model.')}</p>
                     <div className="row">
                       <label className="btn file"><Icon name="upload" size={13} /> {tr('Choisir une photo', 'Choose a photo')}<input type="file" accept="image/*" onChange={onPhoto} /></label>
                       {form.photo && <button className="btn" onClick={() => { patch({ photo: '' }); void run(() => saveProfile({ name: account.name, role: account.role, company: account.company, photo: '' }), tr('Photo retirée', 'Photo removed')) }}>{tr('Retirer', 'Remove')}</button>}
@@ -114,7 +114,7 @@ export function ProfileModal({ lang, account, store, onClose, notify }: Props) {
                 <label className="pf">{tr('Nom complet', 'Full name')}<input value={form.name} placeholder={tr('Prénom Nom', 'First Last')} onChange={(e) => patch({ name: e.target.value })} /></label>
                 <label className="pf">{tr('Fonction', 'Job title')}<input value={form.role} placeholder={tr('Ex. Analyste BI', 'E.g. BI analyst')} onChange={(e) => patch({ role: e.target.value })} /></label>
                 <label className="pf">{tr('Entreprise', 'Company')}<input value={form.company} placeholder={tr('Nom affiché dans la navigation', 'Name shown in the navigation')} onChange={(e) => patch({ company: e.target.value })} /></label>
-                <p className="hint">{tr('Ces informations préremplissent les nouveaux fichiers : nom et fonction en bas de la navigation, entreprise à côté du logo. Les fichiers existants ne changent pas.', 'These details prefill new files: name and job title at the bottom of the navigation, company next to the logo. Existing files do not change.')}</p>
+                <p className="hint">{tr('Ces informations préremplissent un nouveau modèle : nom et fonction en bas de la navigation, entreprise à côté du logo. Vos modèles existants ne changent pas.', 'These details prefill a new model: name and job title at the bottom of the navigation, company next to the logo. Your existing models do not change.')}</p>
                 <div>
                   <button className="btn primary" disabled={busy || !dirty} onClick={() => void run(() => saveProfile(form), tr('Profil enregistré', 'Profile saved'))}>
                     <Icon name="save" size={14} /> {tr('Enregistrer', 'Save')}
@@ -150,7 +150,7 @@ export function ProfileModal({ lang, account, store, onClose, notify }: Props) {
                 <div className="profile-data">
                   <div>
                     <b>{tr('Supprimer mon compte', 'Delete my account')}</b>
-                    <p>{tr('Votre compte et tous vos fichiers et modèles seront supprimés. La demande est envoyée par e-mail.', 'Your account and all your files and models will be deleted. The request is sent by email.')}</p>
+                    <p>{tr('Votre compte et tous vos modèles seront supprimés. La demande est envoyée par e-mail.', 'Your account and all your models will be deleted. The request is sent by email.')}</p>
                   </div>
                   <a className="btn danger-outline" href={mail}>{tr('Demander la suppression', 'Request deletion')}</a>
                 </div>

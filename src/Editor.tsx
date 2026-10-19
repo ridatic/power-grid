@@ -21,7 +21,8 @@ import { HeaderActions } from './components/HeaderActions'
 import type { Account } from './account'
 import type { DocKind, ModelStore, SavedModel } from './storage'
 import { useFeedback } from './feedback'
-import { saveAsModel } from './saveModel'
+import { duplicateModel } from './saveModel'
+import { useFavorites } from './favorites'
 import { ModelsLibrary } from './components/ModelsLibrary'
 import { MediaLibrary, type MediaPick } from './components/MediaLibrary'
 import { T, type Lang } from './i18n'
@@ -46,22 +47,23 @@ export interface EditorProps {
   onLang: (l: Lang) => void
   uiTheme: UiTheme
   onUiTheme: (t: UiTheme) => void
-  kind: DocKind
   account: Account | null
   onProfile: () => void
   onSignOut: () => void
   store: ModelStore
-  /** Cree un nouveau fichier a partir d'un modele et l'ouvre. */
-  onNewFileFrom: (m: SavedModel) => void
+  /** Ouvre un autre de mes modeles (depuis la bibliotheque). */
+  onOpenDoc: (m: SavedModel) => void
   settings: AppSettings
   onSettings: () => void
   docId: string
+  /** Document des recents, ou modele de Mes modeles. */
+  kind: DocKind
 }
 
 type SaveState = 'saved' | 'saving' | 'error'
 
 /** L'editeur d'un modele : reglages a gauche, apercu au centre, pages en bas. */
-export function Editor({ initial, name: initialName, onSave, onBack, lang, onLang, uiTheme, onUiTheme, kind, account, onProfile, onSignOut, store, onNewFileFrom, settings, onSettings, docId }: EditorProps) {
+export function Editor({ initial, name: initialName, onSave, onBack, lang, onLang, uiTheme, onUiTheme, account, onProfile, onSignOut, store, onOpenDoc, settings, onSettings, docId, kind }: EditorProps) {
   const fb = useFeedback()
   const { project, dispatch, undo, redo, canUndo, canRedo } = useProject(initial)
   const [name, setName] = useState(initialName)
@@ -124,7 +126,6 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
   const applyTemplate = (tpl: Template) => {
     dispatch({ t: 'template', items: templateItems(tpl), rows: tpl.rows })
     setSelectedId(null)
-    notify(tr('Disposition appliquée', 'Layout applied'))
   }
 
   const setType = (type: ElementType, props?: Partial<ItemProps>) => selected && dispatch({ t: 'update', id: selected.id, patch: { type, ...(props ? { props: { ...selected.props, ...props } } : {}) } })
@@ -161,8 +162,8 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
     setSelectedId(null)
   }
 
-  // Un fichier s'enregistre seul (si le parametre est actif) ; un modele s'enregistre seulement a la demande.
-  const auto = kind === 'file' && settings.autosave
+  // Enregistrement automatique si le parametre est actif ; sinon bouton Enregistrer (Ctrl S)
+  const auto = settings.autosave
   const [savedSnap, setSavedSnap] = useState({ project, name })
   const doSave = useCallback(async () => {
     setSaveState('saving')
@@ -202,10 +203,9 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
     // un enregistrement automatique encore en attente part tout de suite, pour ne rien perdre
     if (pending) await doSave()
     if (!dirty) return then()
-    const what = kind === 'model' ? tr('ce modèle', 'this model') : tr('ce fichier', 'this file')
     const choice = await fb.choose({
       title: tr('Enregistrer les modifications ?', 'Save your changes?'),
-      message: tr(`Les modifications de ${what} ne sont pas enregistrées. Si vous quittez sans enregistrer, elles seront perdues.`, `Changes to ${what} are not saved. If you leave without saving, they will be lost.`),
+      message: tr('Les modifications ne sont pas enregistrées. Si vous quittez sans enregistrer, elles seront perdues.', 'Changes are not saved. If you leave without saving, they will be lost.'),
       cancelLabel: tr('Rester', 'Stay'),
       choices: [
         { id: 'discard', label: tr('Ne pas enregistrer', 'Don\'t save'), danger: true },
@@ -216,9 +216,46 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
     if (choice === 'save' && (await doSave())) then()
   }
 
+  /* Actions du modele ouvert : favori, dupliquer, supprimer */
+  const fav = useFavorites(store, () => fb.toast(tr('Le favori n\'a pas pu être enregistré.', 'The favorite could not be saved.'), 'error'))
+  const duplicate = async () => {
+    try {
+      await duplicateModel(store, fb, lang, project, name, isModel ? 'model' : 'file')
+    } catch (e) {
+      console.error(e)
+      fb.toast(tr('La copie n\'a pas pu être créée.', 'The copy could not be created.'), 'error')
+    }
+  }
+  // Un document devient un modele quand l'utilisateur l'ajoute a Mes modeles
+  const [isModel, setIsModel] = useState(kind === 'model')
+  // Mes modeles : un interrupteur, comme l'etoile
+  const toggleModel = async () => {
+    const next = !isModel
+    setIsModel(next)
+    try {
+      await store.setKind(docId, next ? 'model' : 'file')
+    } catch (e) {
+      console.error(e)
+      setIsModel(!next)
+      fb.toast(tr('Mes modèles n\'a pas pu être mis à jour.', 'My models could not be updated.'), 'error')
+    }
+  }
+  const removeModel = async () => {
+    const ok = await fb.confirm({ title: tr(`Supprimer « ${name.trim() || initialName} » ?`, `Delete "${name.trim() || initialName}"?`), message: (isModel ? tr('Le modèle est supprimé définitivement, et vous revenez à l\'accueil.', 'The model is deleted for good, and you go back to the home page.') : tr('Le document est supprimé définitivement, et vous revenez à l\'accueil.', 'The document is deleted for good, and you go back to the home page.')), confirmLabel: tr('Supprimer', 'Delete'), danger: true })
+    if (!ok) return
+    try {
+      await store.remove(docId)
+      fav.forget(docId)
+      onBack()
+    } catch (e) {
+      console.error(e)
+      fb.toast(tr('La suppression a échoué. Réessayez.', 'Deleting failed. Try again.'), 'error')
+    }
+  }
+  const starred = fav.isFav(docId)
+
   const resetTheme = () => {
     dispatch({ t: 'cfg', patch: defaultsOf(THEME_KEYS) })
-    notify(tr('Thème réinitialisé', 'Theme reset'))
   }
 
   // Bouton de remise a zero de l'onglet courant (n'apparait que si quelque chose a change)
@@ -230,7 +267,7 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
       return templateId === TEMPLATES[0].id ? null : { label: tr('Revenir au modèle par défaut', 'Back to the default template'), run: () => applyTemplate(TEMPLATES[0]) }
     }
     const keys = TAB_KEYS[tab]
-    return isChanged(cfg, keys) ? { label: tr(`Réinitialiser « ${TAB_NAMES[tab].fr} »`, `Reset "${TAB_NAMES[tab].en}"`), run: () => { dispatch({ t: 'cfg', patch: defaultsOf(keys) }); notify(tr('Valeurs par défaut rétablies', 'Defaults restored')) } } : null
+    return isChanged(cfg, keys) ? { label: tr(`Réinitialiser « ${TAB_NAMES[tab].fr} »`, `Reset "${TAB_NAMES[tab].en}"`), run: () => dispatch({ t: 'cfg', patch: defaultsOf(keys) }) } : null
   })()
 
   const switchLang = (next: Lang) => onLang(next)
@@ -268,7 +305,7 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
     { kind: 'action', id: 'undo', fr: 'Annuler', en: 'Undo', keys: 'annuler retour ctrl z', glyph: '↶', run: undo },
     { kind: 'action', id: 'resetTheme', fr: 'Réinitialiser tout le thème', en: 'Reset the whole theme', keys: 'reinitialiser defaut theme valeurs par defaut reset', glyph: '↺', run: resetTheme },
     { kind: 'action', id: 'uiTheme', fr: 'Interface claire ou sombre', en: 'Light or dark interface', keys: 'interface sombre clair dark theme', glyph: '◑', run: () => onUiTheme(uiTheme === 'dark' ? 'light' : 'dark') },
-    { kind: 'action', id: 'home', fr: 'Retour à mes fichiers et modèles', en: 'Back to my files and models', keys: 'accueil fichiers modeles bibliotheque projets nouveau', glyph: '⌂', run: () => void leave(onBack) },
+    { kind: 'action', id: 'home', fr: 'Retour à l\'accueil', en: 'Back to home', keys: 'accueil modeles favoris recents bibliotheque nouveau', glyph: '⌂', run: () => void leave(onBack) },
   ]
 
   useEffect(() => {
@@ -277,7 +314,7 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
       const k = e.key.toLowerCase()
       if (mod && k === 's') {
         e.preventDefault()
-        if (dirty) void doSave().then((ok) => ok && notify(tr('Modifications enregistrées', 'Changes saved')))
+        if (dirty) void doSave()
         return
       }
       if (mod && k === 'k') {
@@ -322,13 +359,15 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
     <>
       <header className="topbar">
         <div className="brand">
-          <button className="brand-link" onClick={() => void leave(onBack)} aria-label={tr('Retour à mes fichiers et modèles', 'Back to my files and models')} title={tr('Retour à mes fichiers et modèles', 'Back to my files and models')}>
+          <button className="brand-link" onClick={() => void leave(onBack)} aria-label={tr('Retour à l\'accueil', 'Back to home')} title={tr('Retour à l\'accueil', 'Back to home')}>
             <Logo height={32} />
+          </button>
+          <button className="icon-btn home-btn" onClick={() => void leave(onBack)} aria-label={tr('Accueil', 'Home')} title={tr('Retour à l\'accueil : récents, favoris, modèles', 'Back to home: recent, favorites, models')}>
+            <Icon name="home" size={18} />
           </button>
           <div className="doc">
             <div className="doc-line">
-              {kind === 'model' && <span className="kind-badge">{tr('Modèle', 'Model')}</span>}
-              <input className="doc-name" value={name} aria-label={kind === 'model' ? tr('Nom du modèle', 'Model name') : tr('Nom du fichier', 'File name')} title={tr('Renommer', 'Rename')} onChange={(e) => setName(e.target.value)} />
+              <input className="doc-name" value={name} aria-label={isModel ? tr('Nom du modèle', 'Model name') : tr('Nom du document', 'Document name')} title={tr('Renommer', 'Rename')} onChange={(e) => setName(e.target.value)} />
               <Icon name="pencil" size={13} />
             </div>
             <small className={`save-state ${saveState}`}>{saveState === 'saving' || (pending && saveState !== 'error') ? tr('Enregistrement…', 'Saving…') : saveState === 'error' ? tr('Échec de l\'enregistrement', 'Saving failed') : unsaved ? tr('Modifications non enregistrées', 'Unsaved changes') : tr('Enregistré', 'Saved')}</small>
@@ -342,13 +381,12 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
         <HeaderActions lang={lang} onLang={switchLang} uiTheme={uiTheme} onUiTheme={onUiTheme} account={account} onProfile={onProfile} onHome={() => void leave(onBack)} onModels={() => setModels(true)} onSignOut={() => void leave(onSignOut)} onSettings={onSettings} trailing={<button className="btn primary export-btn" onClick={() => setExporting(true)} title={tr('Exporter vers Power BI', 'Export to Power BI')}><Icon name="download" size={15} />{tr('Exporter', 'Export')}</button>}>
           <button className="icon-btn" aria-label={t.undo} title={`${t.undo} (Ctrl Z)`} disabled={!canUndo} onClick={undo}><Icon name="undo" size={18} /></button>
           <button className="icon-btn" aria-label={t.redo} title={`${t.redo} (Ctrl Y)`} disabled={!canRedo} onClick={redo}><Icon name="redo" size={18} /></button>
-          {!auto && (
-            <button className={`icon-btn${dirty ? ' active' : ''}`} disabled={!dirty} aria-label={tr('Enregistrer', 'Save')} title={`${tr('Enregistrer les modifications', 'Save changes')} (Ctrl S)`} onClick={() => void doSave().then((ok) => ok && notify(tr('Modifications enregistrées', 'Changes saved')))}><Icon name="save" size={18} /></button>
-          )}
-          {kind === 'file' && (
-            <button className="icon-btn" aria-label={tr('Enregistrer comme modèle', 'Save as model')} title={tr('Enregistrer comme modèle', 'Save as model')} onClick={() => void saveAsModel(store, fb, lang, project, name.trim() || tr('Sans titre', 'Untitled')).catch((e: unknown) => { console.error(e); fb.toast(tr('Le modèle n\'a pas pu être enregistré.', 'The model could not be saved.'), 'error') })}><Icon name="bookmarkPlus" size={18} /></button>
-          )}
-          <button className="icon-btn" aria-label={tr('Mes modèles', 'My models')} title={tr('Mes modèles : votre bibliothèque de points de départ', 'My models: your library of starting points')} onClick={() => setModels(true)}><Icon name="layout" size={18} /></button>
+          <span className="bar-sep" />
+          <button className={`btn save-btn${dirty ? ' primary' : ''}`} disabled={!dirty} title={`${tr('Enregistrer les modifications', 'Save changes')} (Ctrl S)`} onClick={() => void doSave()}>
+            <Icon name="save" size={15} />
+            {saveState === 'saving' ? tr('Enregistrement…', 'Saving…') : dirty ? tr('Enregistrer', 'Save') : tr('Enregistré', 'Saved')}
+          </button>
+          <button className="icon-btn" aria-label={tr('Mes modèles', 'My models')} title={tr('Mes modèles : ouvrir un autre modèle', 'My models: open another model')} onClick={() => setModels(true)}><Icon name="layout" size={18} /></button>
           <span className="bar-sep" />
         </HeaderActions>
       </header>
@@ -392,9 +430,32 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
             onOpenTab={openTab}
             onMove={moveItem}
             onAdd={addItem}
+            tools={
+              <>
+                <button className={`tool-btn${guides ? ' on' : ''}`} aria-pressed={guides} onClick={() => setGuides(!guides)} title={tr('Afficher la grille', 'Show the grid')} aria-label={tr('Grille', 'Grid')}>
+                  <Icon name="grid" size={17} />
+                </button>
+                <button className={`tool-btn${slots ? ' on' : ''}`} aria-pressed={slots} onClick={() => setSlots(!slots)} title={tr('Afficher les emplacements : où poser les boutons et visuels dans Power BI', 'Show slots: where to place buttons and visuals in Power BI')} aria-label={tr('Emplacements', 'Slots')}>
+                  <Icon name="target" size={17} />
+                </button>
+                <span className="tools-sep" />
+                <button className={`tool-btn fav${starred ? ' on' : ''}`} aria-pressed={starred} onClick={() => fav.toggle(docId)} title={starred ? tr('Retirer des favoris', 'Remove from favorites') : tr('Ajouter aux favoris', 'Add to favorites')} aria-label={starred ? tr('Retirer des favoris', 'Remove from favorites') : tr('Ajouter aux favoris', 'Add to favorites')}>
+                  <Icon name="star" size={17} />
+                </button>
+                <button className={`tool-btn model-tg${isModel ? ' on' : ''}`} aria-pressed={isModel} onClick={() => void toggleModel()} title={isModel ? tr('Retirer de mes modèles', 'Remove from my models') : tr('Ajouter à mes modèles', 'Add to my models')} aria-label={isModel ? tr('Retirer de mes modèles', 'Remove from my models') : tr('Ajouter à mes modèles', 'Add to my models')}>
+                  <Icon name="bookmarkPlus" size={17} />
+                </button>
+                <button className="tool-btn" onClick={() => void duplicate()} title={tr('Dupliquer : une copie sous un nouveau nom', 'Duplicate: a copy under a new name')} aria-label={tr('Dupliquer', 'Duplicate')}>
+                  <Icon name="copy" size={17} />
+                </button>
+                <button className="tool-btn danger" onClick={() => void removeModel()} title={isModel ? tr('Supprimer ce modèle', 'Delete this model') : tr('Supprimer ce document', 'Delete this document')} aria-label={tr('Supprimer', 'Delete')}>
+                  <Icon name="trash" size={17} />
+                </button>
+              </>
+            }
             toolbar={selected && <ZoneToolbar key={selected.id} t={t} lang={lang} cfg={cfg} item={selected} rows={page.rows} onType={setType} onProps={setProps} onRemove={removeSelected} onMedia={(mode, pick) => setMedia({ mode, pick })} />}
           />
-          <PageBar project={project} dispatch={dispatch} lang={lang} guides={guides} slots={slots} onGuides={setGuides} onSlots={setSlots} onPage={goPage} onRemovePage={removePage} />
+          <PageBar project={project} dispatch={dispatch} lang={lang} onPage={goPage} onRemovePage={removePage} />
         </main>
       </div>
 
@@ -416,13 +477,8 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
           lang={lang}
           store={store}
           onClose={() => setModels(false)}
-          onNewFile={(m) => void leave(() => onNewFileFrom(m))}
-          currentId={kind === 'model' ? docId : undefined}
-          onApply={(m) => {
-            dispatch({ t: 'replace', project: m.data })
-            setSelectedId(null)
-            notify(tr(`Modèle « ${m.name} » appliqué`, `Model "${m.name}" applied`))
-          }}
+          currentId={docId}
+          onOpen={(m) => void leave(() => onOpenDoc(m))}
         />
       )}
       {media && <MediaLibrary lang={lang} store={store} mode={media.mode} onPick={media.pick} onClose={() => setMedia(null)} />}

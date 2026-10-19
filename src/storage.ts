@@ -1,7 +1,7 @@
 import type { Project } from './core/types'
 import { supabase } from './lib/supabase'
 
-/** Un fichier (rapport en cours) ou un modele (point de depart reutilisable). */
+/** Un document (« file » : visible dans les recents) ou un modele (« model » : ajoute a Mes modeles par l'utilisateur). */
 export type DocKind = 'file' | 'model'
 
 /** Un document enregistre par l'utilisateur. */
@@ -13,10 +13,10 @@ export interface SavedModel {
   data: Project
 }
 
-/** Une image de la bibliotheque de l'utilisateur. */
 /** Vrai si l'erreur vient d'une base pas a jour (table ou colonne manquante). */
 export const isSchemaError = (e: unknown) => e instanceof Error && /does not exist|schema cache|PGRST205/i.test(e.message)
 
+/** Une image de la bibliotheque de l'utilisateur. */
 export interface MediaItem {
   id: string
   name: string
@@ -33,6 +33,49 @@ export interface ModelStore {
   create(kind: DocKind, name: string, data: Project): Promise<SavedModel>
   save(id: string, name: string, data: Project): Promise<void>
   remove(id: string): Promise<void>
+  /** Ajoute un document a Mes modeles (ou l'en retire). */
+  setKind(id: string, kind: DocKind): Promise<void>
+  /**
+   * Listes d'identifiants gardees avec le compte :
+   * favoris (mes documents, ou `preset:<id>` pour un modele predefini) et recents (documents ouverts, du dernier au premier).
+   */
+  getList(list: IdList): Promise<string[]>
+  setList(list: IdList, ids: string[]): Promise<void>
+}
+
+export type IdList = 'favorites' | 'recents'
+
+/** Identifiant de favori d'un modele predefini. */
+export const presetFav = (id: string) => `preset:${id}`
+
+/** Tous les documents de l'utilisateur (documents et modeles), du plus recemment modifie au plus ancien. */
+export async function listDocs(store: ModelStore): Promise<SavedModel[]> {
+  const [models, files] = await Promise.all([store.list('model'), store.list('file')])
+  return [...models, ...files].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+}
+
+/** Note l'ouverture d'un document : il passe en tete des recents. */
+export async function markOpened(store: ModelStore, id: string) {
+  const ids = await store.getList('recents')
+  await store.setList('recents', [id, ...ids.filter((x) => x !== id)].slice(0, 60))
+}
+
+/**
+ * Recents : les documents ouverts, du dernier au premier,
+ * puis les documents jamais ouverts qui ne sont pas des modeles (pour qu'aucun document ne soit introuvable).
+ */
+export function recentDocs(docs: SavedModel[], recentIds: string[]): SavedModel[] {
+  const byId = new Map(docs.map((d) => [d.id, d]))
+  const opened = recentIds.flatMap((id) => byId.get(id) ?? [])
+  const seen = new Set(opened.map((d) => d.id))
+  return [...opened, ...docs.filter((d) => d.kind === 'file' && !seen.has(d.id))]
+}
+
+/** Un nom libre : « Nom », sinon « Nom 2 », « Nom 3 »... */
+export function uniqueName(name: string, docs: SavedModel[]): string {
+  const taken = new Set(docs.map((d) => d.name.trim().toLowerCase()))
+  if (!taken.has(name.trim().toLowerCase())) return name
+  for (let i = 2; ; i++) if (!taken.has(`${name} ${i}`.toLowerCase())) return `${name} ${i}`
 }
 
 /* ---------- Compte Supabase ---------- */
@@ -83,13 +126,31 @@ function cloudStore(): ModelStore {
       if (error) throw new Error(`projects.insert : ${error.message}`)
       return fromRow(row as Row)
     },
+    // Supabase ne signale pas une ligne refusee par les regles d'acces : on verifie qu'une ligne a bien ete touchee
     async save(id, name, data) {
-      const { error } = await db.from('projects').update({ name, data }).eq('id', id)
+      const { data: rows, error } = await db.from('projects').update({ name, data }).eq('id', id).select('id')
       if (error) throw new Error(`projects.update : ${error.message}`)
+      if (!rows?.length) throw new Error('projects.update : aucune ligne modifiée (document introuvable ou accès refusé)')
     },
     async remove(id) {
-      const { error } = await db.from('projects').delete().eq('id', id)
+      const { data: rows, error } = await db.from('projects').delete().eq('id', id).select('id')
       if (error) throw new Error(`projects.delete : ${error.message}`)
+      if (!rows?.length) throw new Error('projects.delete : aucune ligne supprimée (document introuvable ou accès refusé)')
+    },
+    async setKind(id, kind) {
+      const { data: rows, error } = await db.from('projects').update({ kind }).eq('id', id).select('id')
+      if (error) throw new Error(`projects.kind : ${error.message}`)
+      if (!rows?.length) throw new Error('projects.kind : aucune ligne modifiée (document introuvable ou accès refusé)')
+    },
+    // Favoris et recents sont gardes dans le profil du compte : pas de table en plus
+    async getList(list) {
+      const { data } = await db.auth.getUser()
+      const v = data.user?.user_metadata?.[list] as unknown
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+    },
+    async setList(list, ids) {
+      const { error } = await db.auth.updateUser({ data: { [list]: ids } })
+      if (error) throw new Error(`${list} : ${error.message}`)
     },
   }
 }
@@ -98,6 +159,7 @@ function cloudStore(): ModelStore {
 
 const KEY = 'power-grid.models.v1'
 const MEDIA_KEY = 'power-grid.media.v1'
+const listKey = (list: IdList) => `power-grid.${list}.v1`
 
 function readMedia(): MediaItem[] {
   try {
@@ -162,6 +224,24 @@ function localStore(): ModelStore {
     },
     async remove(id) {
       writeLocal(readLocal().filter((m) => m.id !== id))
+    },
+    async setKind(id, kind) {
+      writeLocal(readLocal().map((m) => (m.id === id ? { ...m, kind } : m)))
+    },
+    async getList(list) {
+      try {
+        const v = JSON.parse(localStorage.getItem(listKey(list)) ?? '[]') as unknown
+        return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+      } catch {
+        return []
+      }
+    },
+    async setList(list, ids) {
+      try {
+        localStorage.setItem(listKey(list), JSON.stringify(ids))
+      } catch {
+        throw new Error('stockage local plein ou indisponible')
+      }
     },
   }
 }

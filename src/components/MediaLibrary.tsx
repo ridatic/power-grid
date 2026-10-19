@@ -48,26 +48,50 @@ export function MediaLibrary({ lang, store, mode, onPick, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  /** Pourquoi l'enregistrement dans la bibliotheque a echoue, en clair. */
+  const reason = (e: unknown) => {
+    const msg = e instanceof Error ? e.message : ''
+    if (isSchemaError(e)) return tr('la bibliothèque n\'existe pas encore dans la base (rejouez supabase/schema.sql)', 'the library does not exist in the database yet (run supabase/schema.sql again)')
+    if (/check constraint|media_data_url_check/i.test(msg)) return tr('image trop lourde', 'image too heavy')
+    if (/JWT|row-level security|permission/i.test(msg)) return tr('session expirée, reconnectez-vous', 'session expired, sign in again')
+    if (/fetch|network/i.test(msg)) return tr('connexion impossible', 'could not connect')
+    return msg || tr('erreur inconnue', 'unknown error')
+  }
+
+  // Comme dans Sira : l'image est lue et allegee d'abord ; si l'enregistrement dans la bibliotheque echoue,
+  // elle reste utilisee sur la page, et on dit pourquoi elle n'a pas ete gardee.
   const upload = async (f: File | undefined) => {
     if (!f) return
     if (!/^image\/(png|jpeg|webp|gif|svg\+xml)$/.test(f.type)) return fb.toast(tr('Format non pris en charge : PNG, JPEG, WebP, GIF ou SVG.', 'Unsupported format: PNG, JPEG, WebP, GIF or SVG.'), 'error')
     setBusy(true)
     try {
-      const dataUrl = await imageToDataUrl(f, 1400, true)
-      const item = await store.addMedia(f.name.replace(/\.[^.]+$/, ''), dataUrl)
-      setMedia((m) => [item, ...(m ?? [])])
-      onPick({ kind: 'image', src: item.dataUrl })
+      let dataUrl: string
+      try {
+        dataUrl = await imageToDataUrl(f, 1400, true)
+      } catch (e) {
+        const big = e instanceof Error && e.message === 'image-too-large'
+        return fb.toast(big ? tr('Image trop lourde, même réduite. Essayez une image plus petite.', 'Image too heavy, even reduced. Try a smaller image.') : tr('Ce fichier n\'a pas pu être lu comme une image.', 'This file could not be read as an image.'), 'error')
+      }
+      // Deja dans la bibliotheque : pas de doublon
+      const existing = media?.find((m) => m.dataUrl === dataUrl)
+      if (!existing) {
+        try {
+          const item = await store.addMedia(f.name.replace(/\.[^.]+$/, ''), dataUrl)
+          setMedia((m) => [item, ...(m ?? [])])
+        } catch (e) {
+          console.error(e)
+          fb.toast(tr(`Image ajoutée à la page, mais pas gardée dans votre bibliothèque : ${reason(e)}.`, `Image added to the page, but not kept in your library: ${reason(e)}.`), 'error')
+        }
+      }
+      onPick({ kind: 'image', src: dataUrl })
       onClose()
-    } catch (e) {
-      console.error(e)
-      fb.toast(isSchemaError(e) ? tr('La bibliothèque d\'images n\'existe pas encore dans la base : rejouez le script supabase/schema.sql dans l\'éditeur SQL de Supabase.', 'The image library does not exist in the database yet: run supabase/schema.sql again in the Supabase SQL editor.') : tr('L\'image n\'a pas pu être ajoutée à votre bibliothèque.', 'The image could not be added to your library.'), 'error')
     } finally {
       setBusy(false)
     }
   }
 
   const remove = async (m: MediaItem) => {
-    if (!(await fb.confirm({ title: tr('Supprimer cette image ?', 'Delete this image?'), message: tr('Elle disparaît de la bibliothèque. Les fichiers qui l\'utilisent déjà la gardent.', 'It leaves the library. Files already using it keep it.'), confirmLabel: tr('Supprimer', 'Delete'), danger: true }))) return
+    if (!(await fb.confirm({ title: tr('Supprimer cette image ?', 'Delete this image?'), message: tr('Elle disparaît de la bibliothèque. Les modèles qui l\'utilisent déjà la gardent.', 'It leaves the library. Models already using it keep it.'), confirmLabel: tr('Supprimer', 'Delete'), danger: true }))) return
     await store.removeMedia(m.id)
     setMedia((list) => (list ?? []).filter((x) => x.id !== m.id))
   }
@@ -94,7 +118,7 @@ export function MediaLibrary({ lang, store, mode, onPick, onClose }: Props) {
 
         {tab === 'image' ? (
           <div className="media-body">
-            <p className="hint">{tr('Logos, photos, captures : importez-les une fois depuis votre ordinateur, puis réutilisez-les dans tous vos fichiers.', 'Logos, photos, screenshots: import them once from your computer, then reuse them in all your files.')}</p>
+            <p className="hint">{tr('Logos, photos, captures : importez-les une fois depuis votre ordinateur, puis réutilisez-les dans tous vos modèles.', 'Logos, photos, screenshots: import them once from your computer, then reuse them in all your models.')}</p>
             <div className="media-grid">
               <button className="media-add" disabled={busy} onClick={() => file.current?.click()}>
                 <Icon name="upload" size={22} />
