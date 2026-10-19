@@ -60,6 +60,9 @@ export interface EditorProps {
   kind: DocKind
 }
 
+/** En dessous de cette largeur, le panneau de reglages s'ouvre par-dessus la page (tablette, telephone). */
+const NARROW = 900
+
 type SaveState = 'saved' | 'saving' | 'error'
 
 /** L'editeur d'un modele : reglages a gauche, apercu au centre, pages en bas. */
@@ -93,7 +96,7 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
   const notify = useCallback((msg: string) => fb.toast(msg), [fb])
 
   // Panneau de reglages : largeur reglable a la souris, repliable ; garde dans ce navigateur
-  const [panel, setPanel] = useState<PanelPref>(loadPanel)
+  const [panel, setPanel] = useState<PanelPref>(() => (window.innerWidth < NARROW ? { ...loadPanel(), open: false } : loadPanel()))
   useEffect(() => savePref('panel', JSON.stringify(panel)), [panel])
   const startPanelResize = (e: RPointerEvent) => {
     if (e.button !== 0) return
@@ -359,7 +362,7 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
     <>
       <header className="topbar">
         <div className="brand">
-          <button className="brand-link" onClick={() => void leave(onBack)} aria-label={tr('Retour à l\'accueil', 'Back to home')} title={tr('Retour à l\'accueil', 'Back to home')}>
+          <button className="brand-link editor-logo" onClick={() => void leave(onBack)} aria-label={tr('Retour à l\'accueil', 'Back to home')} title={tr('Retour à l\'accueil', 'Back to home')}>
             <Logo height={32} />
           </button>
           <button className="icon-btn home-btn" onClick={() => void leave(onBack)} aria-label={tr('Accueil', 'Home')} title={tr('Retour à l\'accueil : récents, favoris, modèles', 'Back to home: recent, favorites, models')}>
@@ -378,13 +381,13 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
           <span>{tr('Rechercher une option, une couleur, une action…', 'Search an option, a color, an action…')}</span>
           <kbd>Ctrl K</kbd>
         </button>
-        <HeaderActions lang={lang} onLang={switchLang} uiTheme={uiTheme} onUiTheme={onUiTheme} account={account} onProfile={onProfile} onHome={() => void leave(onBack)} onModels={() => setModels(true)} onSignOut={() => void leave(onSignOut)} onSettings={onSettings} trailing={<button className="btn primary export-btn" onClick={() => setExporting(true)} title={tr('Exporter vers Power BI', 'Export to Power BI')}><Icon name="download" size={15} />{tr('Exporter', 'Export')}</button>}>
-          <button className="icon-btn" aria-label={t.undo} title={`${t.undo} (Ctrl Z)`} disabled={!canUndo} onClick={undo}><Icon name="undo" size={18} /></button>
-          <button className="icon-btn" aria-label={t.redo} title={`${t.redo} (Ctrl Y)`} disabled={!canRedo} onClick={redo}><Icon name="redo" size={18} /></button>
+        <HeaderActions lang={lang} onLang={switchLang} uiTheme={uiTheme} onUiTheme={onUiTheme} account={account} onProfile={onProfile} onHome={() => void leave(onBack)} onModels={() => setModels(true)} onSignOut={() => void leave(onSignOut)} onSettings={onSettings} trailing={<button className="btn primary export-btn" onClick={() => setExporting(true)} title={tr('Exporter vers Power BI', 'Export to Power BI')}><Icon name="download" size={15} /><span className="lbl">{tr('Exporter', 'Export')}</span></button>}>
+          <button className="icon-btn hist-btn" aria-label={t.undo} title={`${t.undo} (Ctrl Z)`} disabled={!canUndo} onClick={undo}><Icon name="undo" size={18} /></button>
+          <button className="icon-btn hist-btn" aria-label={t.redo} title={`${t.redo} (Ctrl Y)`} disabled={!canRedo} onClick={redo}><Icon name="redo" size={18} /></button>
           <span className="bar-sep" />
           <button className={`btn save-btn${dirty ? ' primary' : ''}`} disabled={!dirty} title={`${tr('Enregistrer les modifications', 'Save changes')} (Ctrl S)`} onClick={() => void doSave()}>
             <Icon name="save" size={15} />
-            {saveState === 'saving' ? tr('Enregistrement…', 'Saving…') : dirty ? tr('Enregistrer', 'Save') : tr('Enregistré', 'Saved')}
+            <span className="lbl">{saveState === 'saving' ? tr('Enregistrement…', 'Saving…') : dirty ? tr('Enregistrer', 'Save') : tr('Enregistré', 'Saved')}</span>
           </button>
           <button className="icon-btn" aria-label={tr('Mes modèles', 'My models')} title={tr('Mes modèles : ouvrir un autre modèle', 'My models: open another model')} onClick={() => setModels(true)}><Icon name="layout" size={18} /></button>
           <span className="bar-sep" />
@@ -416,6 +419,7 @@ export function Editor({ initial, name: initialName, onSave, onBack, lang, onLan
             {isChanged(cfg, THEME_KEYS) && <button className="link" onClick={() => void fb.confirm({ title: tr('Réinitialiser tout le thème ?', 'Reset the whole theme?'), message: tr('Couleurs, navigation et mise en page reviennent aux valeurs par défaut. Les textes sont conservés.', 'Colors, navigation and layout go back to defaults. Texts are kept.'), confirmLabel: tr('Réinitialiser', 'Reset') }).then((ok) => ok && resetTheme())}>{tr('Réinitialiser tout le thème', 'Reset the whole theme')}</button>}
           </div>
         </aside>}
+        {panel.open && <div className="panel-backdrop" aria-hidden="true" onPointerDown={() => setPanel((p) => ({ ...p, open: false }))} />}
         <div className="panel-resizer" role="separator" aria-orientation="vertical" aria-label={tr('Largeur du panneau', 'Panel width')} title={tr('Glisser pour élargir ou réduire. Double-clic : largeur par défaut.', 'Drag to widen or narrow. Double-click: default width.')} onPointerDown={startPanelResize} onDoubleClick={() => setPanel({ open: true, width: PANEL_DEFAULT })} />
 
         <main className="main">

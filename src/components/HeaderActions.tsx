@@ -33,7 +33,7 @@ export function HeaderActions({ lang, onLang, uiTheme, onUiTheme, account, onPro
       <button className="icon-btn" title={tr('Paramètres', 'Settings')} aria-label={tr('Paramètres', 'Settings')} onClick={onSettings}>
         <Icon name="settings" size={18} />
       </button>
-      <button className="icon-btn" title={themeLabel} aria-label={themeLabel} onClick={() => onUiTheme(uiTheme === 'dark' ? 'light' : 'dark')}>
+      <button className="icon-btn theme-btn" title={themeLabel} aria-label={themeLabel} onClick={() => onUiTheme(uiTheme === 'dark' ? 'light' : 'dark')}>
         <Icon name={uiTheme === 'dark' ? 'moon' : 'sun'} size={18} />
       </button>
       <button className="icon-btn lang-btn" title={langLabel} aria-label={langLabel} onClick={() => onLang(lang === 'fr' ? 'en' : 'fr')}>

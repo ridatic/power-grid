@@ -231,7 +231,7 @@ export function Home({ lang, onLang, uiTheme, onUiTheme, store, account, onProfi
               {docs === null ? loading : recents.length === 0 ? (
                 <div className="empty">
                   <b>{tr('Rien pour l\'instant', 'Nothing yet')}</b>
-                  <span>{tr('Partez d\'une page vierge ou d\'un modèle prédéfini, à droite.', 'Start from a blank page or a ready-made model, on the right.')}</span>
+                  <span>{tr('Partez d\'une page vierge ou d\'un modèle prédéfini, dans « Commencer ».', 'Start from a blank page or a ready-made model, in "Get started".')}</span>
                 </div>
               ) : (allRecent ? recents : recents.slice(0, RECENT)).map((m) => card(m, 'recent'))}
               {recents.length > RECENT && <button className="link more-link" onClick={() => setAllRecent(!allRecent)}>{allRecent ? tr('Afficher moins', 'Show less') : tr(`Tout afficher (${recents.length})`, `Show all (${recents.length})`)}</button>}
