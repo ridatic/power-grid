@@ -1,0 +1,106 @@
+# ---- Visual Studio / VS Code / JetBrains ----
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+*.swp
+*.swo
+*~
+
+# ---- .NET / build ----
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+[Pp]ublish/
+x64/
+x86/
+[Aa]rm64/
+build/
+dist/
+out/
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+*.pdb
+*.cache
+*.log
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+BenchmarkDotNet.Artifacts/
+_ReSharper*/
+*.[Rr]e[Ss]harper
+.mono/
+project.lock.json
+launchSettings.json.user
+
+# ---- Node / Electron / front ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.eslintcache
+.parcel-cache/
+.next/
+.vite/
+.turbo/
+coverage/
+*.tsbuildinfo
+release/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# ---- Secrets et configuration locale ----
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+*.snk
+secrets.json
+appsettings.Development.json
+appsettings.Local.json
+*.publishsettings
+
+# ---- Donnees locales / bases ----
+*.db
+*.sqlite
+*.sqlite3
+*.mdf
+*.ldf
+*.bak
+
+# ---- Fichiers temporaires ----
+tmp/
+temp/
+*.tmp
+*.temp
+
+# ---- Systeme ----
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---- Claude Code (local) ----
+.claude/settings.local.json
