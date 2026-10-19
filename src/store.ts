@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useReducer } from 'react'
+import { useCallback, useReducer } from 'react'
 import type { Config, GridItem, PageData, Project } from './core/types'
 import { newId } from './core/grid'
-import { TEMPLATES, templateItems } from './core/layouts'
 import { PALETTES } from './core/palettes'
 
-const KEY = 'power-grid.project.v4'
 const LIMIT = 100
 export const MAX_PAGES = 8
 
@@ -73,25 +71,9 @@ export const DEFAULT_CONFIG: Config = {
 
 const makePage = (name: string, kind: PageData['kind'], items: GridItem[] = [], rows?: number[]): PageData => ({ id: newId('page'), name, kind, icon: null, items, ...(rows ? { rows } : {}) })
 
-function initialProject(): Project {
-  const tpl = TEMPLATES[0]
-  const names = ['Accueil', 'Ventes', 'Clients', 'Produits', 'Régions', 'Rapports']
-  return { cfg: DEFAULT_CONFIG, pages: names.map((n) => makePage(n, 'content', templateItems(tpl), tpl.rows)), active: 0 }
-}
-
-function load(): Project {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (raw) {
-      const p = JSON.parse(raw) as Project
-      if (p?.cfg && Array.isArray(p.pages) && p.pages.length) {
-        return { cfg: { ...DEFAULT_CONFIG, ...p.cfg, menu: { ...DEFAULT_CONFIG.menu, ...p.cfg.menu } }, pages: p.pages, active: Math.min(p.active ?? 0, p.pages.length - 1) }
-      }
-    }
-  } catch {
-    /* stockage indisponible : on repart d'un projet neuf */
-  }
-  return initialProject()
+/** Complete un projet enregistre avec les reglages ajoutes depuis (anciens modeles). */
+export function normalizeProject(p: Project): Project {
+  return { cfg: { ...DEFAULT_CONFIG, ...p.cfg, menu: { ...DEFAULT_CONFIG.menu, ...p.cfg.menu } }, pages: p.pages, active: Math.min(p.active ?? 0, p.pages.length - 1) }
 }
 
 export type Action =
@@ -106,9 +88,9 @@ export type Action =
   | { t: 'removePage'; index: number }
   | { t: 'setPage'; index: number }
   | { t: 'copyToAll' }
+  | { t: 'replace'; project: Project }
   | { t: 'undo' }
   | { t: 'redo' }
-  | { t: 'reset' }
 
 interface State {
   past: Project[]
@@ -157,6 +139,8 @@ function apply(p: Project, a: Action): Project {
       const src = p.pages[p.active]
       return { ...p, pages: p.pages.map((pg) => (pg.kind === 'content' && pg.id !== src.id ? { ...pg, rows: src.rows, items: src.items.map((i) => ({ ...i, id: newId(i.type) })) } : pg)) }
     }
+    case 'replace':
+      return normalizeProject(a.project)
     default:
       return p
   }
@@ -171,23 +155,15 @@ function reducer(s: State, a: Action): State {
     const next = s.future[0]
     return next ? { past: [...s.past, s.present], present: next, future: s.future.slice(1) } : s
   }
-  if (a.t === 'reset') return { past: [...s.past, s.present].slice(-LIMIT), present: initialProject(), future: [] }
   const present = apply(s.present, a)
   if (present === s.present) return s
   if (a.t === 'setPage') return { ...s, present }
   return { past: [...s.past, s.present].slice(-LIMIT), present, future: [] }
 }
 
-export function useProject() {
-  const [s, dispatch] = useReducer(reducer, undefined, () => ({ past: [], present: load(), future: [] }))
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(s.present))
-    } catch {
-      /* quota ou mode prive : la sauvegarde automatique est simplement ignoree */
-    }
-  }, [s.present])
+/** Etat du modele ouvert, avec annuler et retablir. */
+export function useProject(initial: Project) {
+  const [s, dispatch] = useReducer(reducer, initial, (p) => ({ past: [], present: normalizeProject(p), future: [] }))
 
   const undo = useCallback(() => dispatch({ t: 'undo' }), [])
   const redo = useCallback(() => dispatch({ t: 'redo' }), [])

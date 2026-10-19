@@ -62,6 +62,7 @@ const P = (id: string, fr: string, en: string, base: string, scheme: Scheme, ind
 const E = (id: string, fr: string, en: string, colors: string[], industry: Industry, feeling: Feeling, tone: Tone): Palette => ({ id, name: { fr, en }, colors, industry, feeling, tone })
 
 export const PALETTES: Palette[] = [
+  E('ember', 'Braise', 'Ember', ['#EA580C', '#1E3A8A', '#F59E0B', '#0EA5E9', '#10B981', '#E11D48', '#94A3B8', '#334155'], 'energy', 'energetic', 'warm'),
   E('sun', 'Solaire', 'Sun', ['#F6B91A', '#7856E8', '#3976F6', '#8CA7F8', '#19A985', '#F17B53', '#C4CDE0', '#14223C'], 'energy', 'energetic', 'warm'),
   P('navy', 'Bleu marine', 'Navy', '#1F3A5F', 'complementary', 'finance', 'trust', 'cool'),
   P('bank', 'Banque', 'Banking', '#0B5394', 'analogous', 'finance', 'trust', 'cool'),

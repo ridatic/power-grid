@@ -104,3 +104,6 @@ $RECYCLE.BIN/
 
 # ---- Claude Code (local) ----
 .claude/settings.local.json
+
+# ---- Ressources locales (emplacements des comptes et des secrets) ----
+docs/resources.md

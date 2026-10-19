@@ -3,7 +3,7 @@ import type { IconBacking, IconStyle, IconWeight } from './icons'
 export type Mode = 'light' | 'dark'
 export type PageBg = 'soft' | 'plain' | 'warm'
 export type Density = 'comfortable' | 'balanced' | 'dense'
-export type ElementType = 'kpi' | 'chart' | 'table' | 'slicer' | 'map' | 'text' | 'logo' | 'header'
+export type ElementType = 'kpi' | 'chart' | 'table' | 'slicer' | 'map' | 'text' | 'logo' | 'header' | 'image' | 'icon'
 
 export type NavFrame = 'sidebar' | 'floating' | 'rail' | 'toprail' | 'tabs' | 'notch' | 'folder' | 'filter' | 'capsule' | 'none'
 export type NavTone = 'navy' | 'brand' | 'color' | 'tint' | 'paper'
@@ -114,6 +114,9 @@ export interface ItemProps {
   align?: 'left' | 'center' | 'right'
   size?: 'compact' | 'medium' | 'large'
   spark?: boolean
+  src?: string // image (data URL)
+  fit?: 'cover' | 'contain' // ajustement de l'image
+  text?: string // contenu d'une zone de texte
 }
 
 /** Un element pose sur la grille. col et row commencent a 1. */

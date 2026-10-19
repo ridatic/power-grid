@@ -1,5 +1,5 @@
 import type { Config, ElementType, PageData, Rect } from './types'
-import { isHidden, itemRect } from './grid'
+import { COLS, colWidth, gapOf, gridRect, isHidden, itemRect, rowHeights, rowTops } from './grid'
 import { cardFill, navSurface, resolveColors } from './layout'
 import { buildNav, navInsets, px, type NavModel } from './nav'
 import { drawIcon } from './icons'
@@ -21,10 +21,15 @@ export interface PageModel {
  * Fond d'une page : navigation, titre, cartes (ou menu principal).
  * Les visuels Power BI se posent par-dessus ; les boutons de page se posent sur les emplacements retournes.
  */
-export function buildPage(cfg: Config, pages: PageData[], activeIndex: number, names?: Record<ElementType, string>): PageModel {
+export interface BuildOptions {
+  /** Apercu seulement : la grille, dessinee sous les cartes pour ne pas les chevaucher. */
+  guides?: boolean
+}
+
+export function buildPage(cfg: Config, pages: PageData[], activeIndex: number, names?: Record<ElementType, string>, opts: BuildOptions = {}): PageModel {
   const page = pages[activeIndex]
   const c = resolveColors(cfg)
-  const head = `<svg xmlns="http://www.w3.org/2000/svg" width="${cfg.width}" height="${cfg.height}" viewBox="0 0 ${cfg.width} ${cfg.height}"><defs><filter id="sh" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#1c3151" flood-opacity="0.07"/></filter></defs>`
+  const head = `<svg xmlns="http://www.w3.org/2000/svg" width="${cfg.width}" height="${cfg.height}" viewBox="0 0 ${cfg.width} ${cfg.height}"><defs><filter id="sh" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#1c3151" flood-opacity="0.16"/></filter></defs>`
 
   if (page.kind === 'menu') {
     const menu = buildMenu(cfg, pages)
@@ -38,12 +43,25 @@ export function buildPage(cfg: Config, pages: PageData[], activeIndex: number, n
   const S = navSurface(cfg)
   const texId = 'tex'
   if (cfg.texture === 'glow') {
-    out.push(`<defs><radialGradient id="${texId}" cx="0.85" cy="0" r="0.9"><stop offset="0" stop-color="${c.accent}" stop-opacity="0.28"/><stop offset="1" stop-color="${c.accent}" stop-opacity="0"/></radialGradient></defs>`)
+    out.push(`<defs><radialGradient id="${texId}" cx="0.85" cy="0" r="0.9"><stop offset="0" stop-color="${c.accent}" stop-opacity="0.4"/><stop offset="1" stop-color="${c.accent}" stop-opacity="0"/></radialGradient></defs>`)
   } else if (cfg.texture === 'dots') {
-    out.push(`<defs><pattern id="${texId}" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.3" fill="${c.accent}" fill-opacity="0.22"/></pattern></defs>`)
+    out.push(`<defs><pattern id="${texId}" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.5" fill="${c.accent}" fill-opacity="0.38"/></pattern></defs>`)
   }
 
   out.push(nav.svg)
+
+  if (opts.guides) {
+    const g = gridRect(cfg)
+    const cw = colWidth(cfg)
+    const gap = gapOf(cfg)
+    const tops = rowTops(cfg, page.rows)
+    const hs = rowHeights(cfg, page.rows)
+    const line = cfg.mode === 'dark' ? '#FFFFFF' : '#64748B'
+    out.push(`<g fill="none" stroke="${line}" stroke-opacity="0.18" stroke-dasharray="4 4" stroke-width="1">`)
+    for (let i = 0; i < COLS; i++) out.push(`<rect x="${g.x + i * (cw + gap)}" y="${g.y}" width="${cw}" height="${g.h}"/>`)
+    for (let i = 0; i < tops.length; i++) out.push(`<line x1="${g.x}" x2="${g.x + g.w}" y1="${tops[i] + hs[i]}" y2="${tops[i] + hs[i]}"/>`)
+    out.push('</g>')
+  }
 
   for (const it of page.items) {
     if (isHidden(cfg, it)) continue
@@ -53,8 +71,33 @@ export function buildPage(cfg: Config, pages: PageData[], activeIndex: number, n
       out.push(...pillSvg(cfg, z, variant, it.props?.title ?? ''))
       continue
     }
+    if (it.type === 'image') {
+      if (it.props?.src) out.push(imageSvg(z, it.props.src, it.props.fit ?? 'cover', cfg.radius, `img-${it.id}`))
+      continue
+    }
+    if (it.type === 'icon') {
+      const size = Math.min(z.w, z.h) * 0.8
+      out.push(drawIcon(it.props?.icon ?? 'star', z.x + (z.w - size) / 2, z.y + (z.h - size) / 2, size, { style: cfg.iconStyle, weight: cfg.iconWeight, backing: cfg.iconBacking, color: c.accent, accent: c.accent }))
+      continue
+    }
+    if (it.type === 'text') {
+      if (it.props?.text) {
+        const size = cfg.cardSize + 2
+        const lines = it.props.text.split('\n')
+        const align = it.props.align ?? 'left'
+        const x = align === 'center' ? z.x + z.w / 2 : align === 'right' ? z.x + z.w : z.x
+        const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'
+        const y0 = z.y + z.h / 2 - ((lines.length - 1) * size * 1.35) / 2 + size / 3
+        lines.forEach((l, k) => out.push(`<text x="${x}" y="${y0 + k * size * 1.35}" text-anchor="${anchor}" font-size="${size}" font-family="${f}" fill="${c.text}">${esc(l)}</text>`))
+      }
+      continue
+    }
     if (it.type === 'logo' && variant === 'avatar') {
       const r = Math.min(z.w, z.h) / 2
+      if (it.props?.src) {
+        out.push(imageSvg({ x: z.x + z.w / 2 - r, y: z.y + z.h / 2 - r, w: r * 2, h: r * 2 }, it.props.src, 'cover', r, `av-${it.id}`))
+        continue
+      }
       out.push(`<circle cx="${z.x + z.w / 2}" cy="${z.y + z.h / 2}" r="${r}" fill="#64748B"/><text x="${z.x + z.w / 2}" y="${z.y + z.h / 2 + cfg.textSize / 3}" text-anchor="middle" font-size="${cfg.textSize - 1}" font-weight="700" font-family="${f}" fill="#FFFFFF">${esc(it.props?.title ?? '')}</text>`)
       continue
     }
@@ -82,6 +125,11 @@ export function buildPage(cfg: Config, pages: PageData[], activeIndex: number, n
   out.push(...footerSvg(cfg))
   out.push('</svg>')
   return { svg: out.join(''), nav, menu: null }
+}
+
+/** Image recadree dans un rectangle aux coins arrondis. */
+function imageSvg(z: Rect, src: string, fit: 'cover' | 'contain', radius: number, id: string): string {
+  return `<clipPath id="${id}"><rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="${radius}"/></clipPath><image href="${src}" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" preserveAspectRatio="${fit === 'contain' ? 'xMidYMid meet' : 'xMidYMid slice'}" clip-path="url(#${id})"/>`
 }
 
 /** Zone de recherche ou de dates : une pastille, sans carte. */

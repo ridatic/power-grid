@@ -1,6 +1,7 @@
 import { Fragment, type CSSProperties, type ReactNode } from 'react'
 import type { Colors, GridItem } from '../core/types'
 import { mix } from '../core/color'
+import { CITIES, LAND_PATHS, project } from './worldMap'
 
 const BARS = [45, 70, 55, 90, 65, 80, 50, 75]
 
@@ -29,40 +30,60 @@ interface Props {
   u: number // unite : largeur de la grille / 1192
   w: number
   h: number
+  ts?: number // echelle du texte (1 = taille par defaut)
 }
 
 /** Apercu fidele d'un visuel, dessine par-dessus la carte du fond. Toutes les tailles sont en pixels de page. */
-export function ElementView({ item, colors: c, u, w, h }: Props) {
+export function ElementView({ item, colors: c, u, w, h, ts = 1 }: Props) {
   const p = item.props ?? {}
   const f = (n: number) => `${n * u}px`
+  // taille du texte, suivant le reglage « Taille du texte des visuels »
+  const ft = (n: number) => `${n * u * ts}px`
   const box: CSSProperties = { position: 'absolute', inset: 0, boxSizing: 'border-box', overflow: 'hidden', display: 'flex' }
   const head = (title: string, right?: ReactNode): ReactNode => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: f(11), fontWeight: 750, marginBottom: f(9), gap: f(8), color: c.text, flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: ft(11), fontWeight: 750, marginBottom: f(9), gap: f(8), color: c.text, flexShrink: 0 }}>
       <span>{title}</span>
       {right}
     </div>
   )
   const pill = (label: string): ReactNode => (
-    <span style={{ border: `1px solid ${c.border}`, borderRadius: f(6), padding: `${f(5)} ${f(7)}`, fontSize: f(9), fontWeight: 500, color: c.muted }}>{label} ⌄</span>
+    <span style={{ border: `1px solid ${c.border}`, borderRadius: f(6), padding: `${f(5)} ${f(7)}`, fontSize: ft(9), fontWeight: 500, color: c.muted }}>{label} ⌄</span>
   )
 
   if (item.type === 'kpi') {
-    const pad = f(p.size === 'compact' ? 7 : p.size === 'large' ? 20 : 12)
+    const title = p.title ?? 'Indicateur'
+    const value = p.value ?? '1 248'
+    const padU = p.size === 'compact' ? 7 : p.size === 'large' ? 20 : 12
+    // Le contenu s'adapte a la place disponible : on retire d'abord le texte secondaire, puis l'icone, puis la variation.
+    const levels = [
+      { sub: true, icon: true, varia: true, need: 94 },
+      { sub: false, icon: true, varia: true, need: 79 },
+      { sub: false, icon: false, varia: true, need: 64 },
+      { sub: false, icon: false, varia: false, need: 45 },
+    ]
+    const fitH = (need: number) => h / ((need + padU * 2) * u)
+    const lvl = levels.find((l) => fitH(l.need) >= 0.9) ?? levels[levels.length - 1]
+    const needW = Math.max(value.length * 11.5, title.length * 5.4 + (lvl.icon ? 33 : 0)) + padU * 2 + 8
+    const k = Math.max(0.4, Math.min(1, fitH(lvl.need), w / (needW * u)))
+    const fk = (n: number) => `${n * u * k * ts}px`
+    const pad = fk(padU)
     const align = p.align ?? 'left'
-    const spark = p.spark ?? true
+    const spark = (p.spark ?? true) && w / (u * k) > 150 && lvl.varia
     return (
       <div style={{ ...box, flexDirection: 'column', justifyContent: 'center', padding: pad, textAlign: align }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: f(7), fontSize: f(10), color: c.muted, whiteSpace: 'nowrap', justifyContent: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start' }}>
-          <span style={{ display: 'grid', placeItems: 'center', width: f(26), height: f(26), borderRadius: f(8), background: `linear-gradient(135deg, ${mix(c.accent, '#ffffff', 0.78)}, ${mix(c.accent, '#ffffff', 0.45)})`, color: mix(c.accent, '#000000', 0.45), fontSize: f(13), flexShrink: 0 }}>{p.icon ?? '▤'}</span>
-          {p.title ?? 'Indicateur'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: fk(7), fontSize: fk(10), color: c.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', justifyContent: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start' }}>
+          {lvl.icon && <span style={{ display: 'grid', placeItems: 'center', width: fk(26), height: fk(26), borderRadius: fk(8), background: `linear-gradient(135deg, ${mix(c.accent, '#ffffff', 0.78)}, ${mix(c.accent, '#ffffff', 0.45)})`, color: mix(c.accent, '#000000', 0.45), fontSize: fk(13), flexShrink: 0 }}>{p.icon ?? '▤'}</span>}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
         </div>
-        <div style={{ fontSize: f(19), fontWeight: 800, letterSpacing: '-0.02em', margin: `${f(10)} 0 ${f(6)}`, whiteSpace: 'nowrap', color: c.text }}>{p.value ?? '1 248'}</div>
-        <div style={{ fontSize: f(10), fontWeight: 700, color: '#14a780' }}>
-          ◆ {p.variation ?? '+4,2 %'}
-          <small style={{ display: 'block', fontWeight: 400, color: c.muted, marginTop: f(2), fontSize: f(10) }}>{p.sub ?? 'vs. période précédente'}</small>
-        </div>
+        <div style={{ fontSize: fk(19), lineHeight: 1.25, fontWeight: 800, letterSpacing: '-0.02em', margin: `${fk(lvl.icon ? 10 : 6)} 0 ${fk(lvl.varia ? 6 : 0)}`, whiteSpace: 'nowrap', color: c.text }}>{value}</div>
+        {lvl.varia && (
+          <div style={{ fontSize: fk(10), lineHeight: 1.3, fontWeight: 700, color: '#14a780', whiteSpace: 'nowrap' }}>
+            ◆ {p.variation ?? '+4,2 %'}
+            {lvl.sub && <small style={{ display: 'block', fontWeight: 400, color: c.muted, marginTop: fk(2), fontSize: fk(10), overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.sub ?? 'vs. période précédente'}</small>}
+          </div>
+        )}
         {spark && (
-          <svg viewBox="0 0 50 20" style={{ position: 'absolute', right: pad, bottom: f(12), width: f(47), height: f(18) }}>
+          <svg viewBox="0 0 50 20" style={{ position: 'absolute', right: pad, bottom: pad, width: fk(47), height: fk(18) }}>
             <path d="M1 17 L10 12 L18 15 L27 6 L34 10 L42 3 L49 1" fill="none" stroke={c.accent} strokeWidth="1.8" />
           </svg>
         )}
@@ -114,14 +135,14 @@ export function ElementView({ item, colors: c, u, w, h }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: f(14), flex: 1, minHeight: 0 }}>
             <div style={{ position: 'relative', width: size, height: size, borderRadius: '50%', flexShrink: 0, background: `conic-gradient(${col[0]} 0 34%, ${col[1]} 34% 52.5%, ${col[2]} 52.5% 71%, ${col[3]} 71% 83.4%, ${col[4]} 83.4%)` }}>
               <div style={{ position: 'absolute', inset: size * 0.2, borderRadius: '50%', background: c.border === '#2A3350' ? '#1A2132' : '#fff' }} />
-              <div style={{ position: 'absolute', inset: 0, display: 'grid', placeContent: 'center', textAlign: 'center', fontSize: f(11), fontWeight: 800, color: c.text }}>
+              <div style={{ position: 'absolute', inset: 0, display: 'grid', placeContent: 'center', textAlign: 'center', fontSize: ft(11), fontWeight: 800, color: c.text }}>
                 1 248 320 €
-                <small style={{ fontSize: f(9), color: c.muted, fontWeight: 400, marginTop: f(3) }}>Total</small>
+                <small style={{ fontSize: ft(9), color: c.muted, fontWeight: 400, marginTop: f(3) }}>Total</small>
               </div>
             </div>
             <div style={{ flex: 1, display: 'grid', gap: f(11), minWidth: 0 }}>
               {LEGEND.map(([name, pct], i) => (
-                <div key={name} style={{ display: 'flex', alignItems: 'center', gap: f(6), fontSize: f(9), color: c.muted, whiteSpace: 'nowrap' }}>
+                <div key={name} style={{ display: 'flex', alignItems: 'center', gap: f(6), fontSize: ft(9), color: c.muted, whiteSpace: 'nowrap' }}>
                   <i style={{ width: f(7), height: f(7), borderRadius: '50%', background: col[i], flexShrink: 0, display: 'block' }} />
                   {name}
                   <b style={{ marginLeft: 'auto', fontWeight: 600 }}>{pct}</b>
@@ -149,7 +170,7 @@ export function ElementView({ item, colors: c, u, w, h }: Props) {
     return (
       <div style={{ ...box, flexDirection: 'column', padding: `${f(12)} ${f(13)}` }}>
         {head(p.title ?? 'Tableau', <span style={{ color: c.muted }}>•••</span>)}
-        <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: f(9), whiteSpace: 'nowrap' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: ft(9), whiteSpace: 'nowrap' }}>
           <thead>
             <tr>{['Produit', 'Catégorie', 'Ventes', 'CA', 'Évolution'].map((t) => <th key={t} style={th}>{t}</th>)}</tr>
           </thead>
@@ -189,16 +210,30 @@ export function ElementView({ item, colors: c, u, w, h }: Props) {
   }
 
   if (item.type === 'map') {
+    const dark = c.border === '#2A3350'
+    const land = dark ? '#334063' : '#D3DAE5'
+    const sea = dark ? '#151B2A' : '#EEF3F9'
+    const ctrl: CSSProperties = { width: f(18), height: f(18), display: 'grid', placeItems: 'center', fontSize: ft(12), fontWeight: 700, color: c.muted, background: dark ? '#1A2132' : '#fff' }
     return (
-      <div
-        style={{
-          ...box,
-          backgroundImage: `radial-gradient(${c.accent} 0 28%, transparent 30%), radial-gradient(${c.data[1]} 0 22%, transparent 24%), radial-gradient(${c.border} 0 12%, transparent 14%)`,
-          backgroundSize: `22% 38%, 17% 28%, ${f(20)} ${f(20)}`,
-          backgroundPosition: '28% 40%, 64% 62%, 0 0',
-          opacity: 0.55,
-        }}
-      />
+      <div style={{ ...box, flexDirection: 'column', padding: f(12) }}>
+        {head(p.title ?? 'Ventes par pays')}
+        <div style={{ position: 'relative', flex: 1, minHeight: 0, borderRadius: f(6), overflow: 'hidden', background: sea }}>
+          <svg viewBox="-4 8 368 140" preserveAspectRatio="xMidYMid meet" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <g fill={land} stroke={sea} strokeWidth="0.6" strokeLinejoin="round">
+              {LAND_PATHS.map((d, i) => <path key={i} d={d} />)}
+            </g>
+            {CITIES.map(([lon, lat, size], i) => {
+              const [x, y] = project(lon, lat)
+              const col = c.data[i % 2 === 0 ? 0 : 1]
+              return <circle key={i} cx={x} cy={y} r={3 + size * 7} fill={col} fillOpacity="0.45" stroke={col} strokeWidth="1" />
+            })}
+          </svg>
+          <div style={{ position: 'absolute', right: f(6), top: f(6), display: 'flex', flexDirection: 'column', borderRadius: f(4), overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.18)' }}>
+            <span style={ctrl}>+</span>
+            <span style={{ ...ctrl, borderTop: `1px solid ${c.border}` }}>−</span>
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -211,6 +246,17 @@ export function ElementView({ item, colors: c, u, w, h }: Props) {
     )
   }
 
+  if (item.type === 'icon') return null
+  if (item.type === 'image') {
+    if (p.src) return null
+    return (
+      <div style={{ ...box, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: f(6), border: `${Math.max(1, u)}px dashed ${c.muted}`, borderRadius: 'inherit', color: c.muted, fontSize: ft(10), textAlign: 'center', padding: f(8) }}>
+        <svg width={18 * u} height={18 * u} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="m21 16-5-5-9 9" /></svg>
+        Image
+      </div>
+    )
+  }
+  if (item.type === 'text' && p.text) return null
   if (item.type === 'text') {
     return (
       <div style={{ ...box, flexDirection: 'column', justifyContent: 'center', gap: f(8), padding: f(14), border: `1px dashed ${c.muted}`, borderRadius: 'inherit' }}>

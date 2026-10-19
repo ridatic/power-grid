@@ -61,3 +61,60 @@ export function itemRect(cfg: Config, it: Pick<GridItem, 'col' | 'row' | 'cs' | 
 
 let counter = 0
 export const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(counter++).toString(36)}`
+
+export type Box = Pick<GridItem, 'col' | 'row' | 'cs' | 'rs'>
+
+/** Taille proposee quand on ajoute un element. */
+export const DEFAULT_SIZE: Record<GridItem['type'], { cs: number; rs: number }> = {
+  kpi: { cs: 3, rs: 1 },
+  chart: { cs: 6, rs: 3 },
+  table: { cs: 12, rs: 2 },
+  slicer: { cs: 3, rs: 1 },
+  map: { cs: 6, rs: 3 },
+  text: { cs: 4, rs: 1 },
+  logo: { cs: 2, rs: 1 },
+  header: { cs: 12, rs: 1 },
+  image: { cs: 3, rs: 2 },
+  icon: { cs: 1, rs: 1 },
+}
+
+export const overlaps = (a: Box, b: Box) => a.col < b.col + b.cs && b.col < a.col + a.cs && a.row < b.row + b.rs && b.row < a.row + a.rs
+
+/** Garde un bloc entierement dans la grille. */
+export function clampBox(b: Box): Box {
+  const cs = Math.min(Math.max(1, b.cs), COLS)
+  const rs = Math.min(Math.max(1, b.rs), ROWS)
+  return { cs, rs, col: Math.min(Math.max(1, b.col), COLS - cs + 1), row: Math.min(Math.max(1, b.row), ROWS - rs + 1) }
+}
+
+export const isFree = (items: GridItem[], b: Box, ignoreId?: string) => !items.some((i) => i.id !== ignoreId && overlaps(i, b))
+
+/** La place libre la plus proche de la position souhaitee, ou null s'il n'y en a aucune. */
+export function findSlot(items: GridItem[], want: Box, ignoreId?: string): Box | null {
+  const w = clampBox(want)
+  let best: Box | null = null
+  let bestD = Infinity
+  for (let row = 1; row <= ROWS - w.rs + 1; row++) {
+    for (let col = 1; col <= COLS - w.cs + 1; col++) {
+      const b = { col, row, cs: w.cs, rs: w.rs }
+      if (!isFree(items, b, ignoreId)) continue
+      const d = Math.abs(col - w.col) + Math.abs(row - w.row) * 1.5
+      if (d < bestD) {
+        bestD = d
+        best = b
+      }
+    }
+  }
+  return best
+}
+
+/** Colonne et ligne (a partir de 1) sous un point de la page, bornees a la grille. */
+export function cellAt(cfg: Config, weights: number[] | undefined, x: number, y: number): { col: number; row: number } {
+  const g = gridRect(cfg)
+  const step = colWidth(cfg) + gapOf(cfg)
+  const col = Math.min(COLS, Math.max(1, Math.floor((x - g.x) / step) + 1))
+  const tops = rowTops(cfg, weights)
+  let row = 1
+  for (let i = 0; i < tops.length; i++) if (y >= tops[i] - gapOf(cfg) / 2) row = i + 1
+  return { col, row }
+}

@@ -1,60 +1,95 @@
-import { useId, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
-/** Section repliable : une seule ouverte a la fois, avec un resume du choix courant. */
-export function Section({ id, icon, title, summary, open, onToggle, children }: { id: string; icon: string; title: string; summary?: string; open: boolean; onToggle: (id: string) => void; children: ReactNode }) {
+/** En-tete d'un onglet : un titre et une phrase qui dit a quoi il sert. */
+export function PanelHead({ title, desc }: { title: string; desc: string }) {
   return (
-    <div className={`accordion${open ? ' open' : ''}`}>
-      <button className="acc-head" aria-expanded={open} onClick={() => onToggle(id)}>
-        <span className="acc-icon" aria-hidden="true">{icon}</span>
-        {title}
-        <span className="summary">{summary}</span>
-        <span className="chev" aria-hidden="true">⌄</span>
-      </button>
-      {open && <div className="acc-body">{children}</div>}
+    <div className="panel-head">
+      <h2>{title}</h2>
+      <p>{desc}</p>
     </div>
   )
 }
 
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+/** Un reglage : son nom, son controle, une aide courte. data-opt sert a la recherche. */
+export function Opt({ id, label, hint, children, aside, reset, resetTitle }: { id: string; label?: string; hint?: string; children: ReactNode; aside?: ReactNode; reset?: () => void; resetTitle?: string }) {
   return (
-    <>
-      <span className="field-label">{label}</span>
+    <div className="opt" data-opt={id}>
+      {label && (
+        <div className="opt-label">
+          <span>{label}</span>
+          <span className="opt-aside">
+            {aside}
+            {reset && (
+              <button className="reset" onClick={reset} title={resetTitle} aria-label={resetTitle}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" /></svg>
+              </button>
+            )}
+          </span>
+        </div>
+      )}
       {children}
-      {hint && <p className="tiny-note">{hint}</p>}
-    </>
+      {hint && <p className="opt-hint">{hint}</p>}
+    </div>
   )
 }
 
-/** Choix exclusif, presente comme les boutons radio de la maquette. */
-export function Radios<T extends string | number>({ value, options, onChange, label }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void; label?: string }) {
-  const name = useId()
+/** Choix exclusif sur une ligne ; un point marque la valeur par defaut. */
+export function Seg<T extends string | number>({ value, options, onChange, label, def }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void; label?: string; def?: T }) {
   return (
-    <div className="radio-list" role="radiogroup" aria-label={label}>
+    <div className="seg" role="radiogroup" aria-label={label}>
       {options.map((o) => (
-        <label key={String(o.v)} className="radio">
-          <input type="radio" name={name} checked={o.v === value} onChange={() => onChange(o.v)} />
+        <button key={String(o.v)} role="radio" aria-checked={o.v === value} className={o.v === value ? 'on' : ''} onClick={() => onChange(o.v)}>
           {o.label}
-        </label>
+          {o.v === def && <i className="def-dot" aria-hidden="true" />}
+        </button>
       ))}
     </div>
   )
 }
 
-export function Check({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Switch({ id, checked, onChange, label, reset, resetTitle }: { id: string; checked: boolean; onChange: (v: boolean) => void; label: string; reset?: () => void; resetTitle?: string }) {
   return (
-    <label className="radio check">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      {label}
-    </label>
+    <div className="opt switch-row" data-opt={id}>
+      <button className={`switch${checked ? ' on' : ''}`} role="switch" aria-checked={checked} onClick={() => onChange(!checked)}>
+        <span>{label}</span>
+        <i aria-hidden="true" />
+      </button>
+      {reset && (
+        <button className="reset" onClick={reset} title={resetTitle} aria-label={resetTitle}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" /></svg>
+        </button>
+      )}
+    </div>
   )
 }
 
-/** Carte de choix avec un schema et un nom, comme la grille de navigation de la maquette. */
-export function Choice({ selected, onClick, diagram, label }: { selected: boolean; onClick: () => void; diagram: ReactNode; label: string }) {
+/** Carte cliquable avec un apercu et un nom. */
+export function Card({ selected, onClick, thumb, label, disabled, isDefault }: { selected: boolean; onClick: () => void; thumb: ReactNode; label: string; disabled?: boolean; isDefault?: boolean }) {
   return (
-    <button className={`layout-choice${selected ? ' active' : ''}`} aria-pressed={selected} onClick={onClick}>
-      <span className="diagram-box">{diagram}</span>
-      <span className="choice-name">{selected ? '✓ ' : ''}{label}</span>
+    <button className={`card${selected ? ' on' : ''}`} aria-pressed={selected} onClick={onClick} disabled={disabled}>
+      <span className="card-thumb">{thumb}</span>
+      <span className="card-name">
+        {label}
+        {isDefault && <i className="def-dot" aria-hidden="true" />}
+      </span>
     </button>
   )
+}
+
+/** Reglages secondaires, caches par defaut. */
+export function More({ open, onToggle, label, children }: { open: boolean; onToggle: () => void; label: string; children: ReactNode }) {
+  return (
+    <div className={`more${open ? ' open' : ''}`}>
+      <button className="more-head" aria-expanded={open} onClick={onToggle}>
+        <span>{label}</span>
+        <i aria-hidden="true">›</i>
+      </button>
+      {open && <div className="more-body">{children}</div>}
+    </div>
+  )
+}
+
+/** Sous-titre d'un groupe de reglages dans un onglet. */
+export function Group({ title }: { title: string }) {
+  return <h3 className="group-title">{title}</h3>
 }
