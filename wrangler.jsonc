@@ -1,0 +1,14 @@
+{
+  "name": "power-grid",
+  "main": "worker/index.ts",
+  // Un déploiement ne supprime pas les variables et secrets créés dans le tableau de bord (MAINTENANCE_CODE)
+  "keep_vars": true,
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Le Worker voit les pages ; les fichiers construits et ceux de la page de maintenance passent directement
+    "run_worker_first": ["/*", "!/assets/*", "!/status/*", "!/favicon.svg"],
+  },
+}

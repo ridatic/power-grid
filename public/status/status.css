@@ -1,0 +1,100 @@
+/* Pages de maintenance et d'accès réservé de Power-Grid (servies par le Worker, sans l'application) */
+:root {
+  --bg: #e9ebef;
+  --panel: #f6f7f9;
+  --card: #ffffff;
+  --line: #d9dde3;
+  --ink: #1c1f24;
+  --muted: #646b76;
+  --accent: #ea580c;
+  --accent-2: #dc2626;
+  --navy: #172740;
+  --ok: #14a780;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f12;
+    --panel: #18181b;
+    --card: #1f1f23;
+    --line: #2a2a30;
+    --ink: #f1f2f4;
+    --muted: #9ca3af;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: radial-gradient(1200px 600px at 50% 45%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%), var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 'Geist', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+main { position: relative; min-height: 100%; display: grid; place-items: center; padding: 32px 16px; overflow: hidden; }
+
+/* Nom manuscrit, en dégradé, qui s'écrit puis s'efface */
+.word { display: inline-flex; align-items: center; gap: 10px; padding: 0 14px 6px 0; }
+.word svg { width: 46px; height: 46px; flex-shrink: 0; }
+.word span {
+  font: 700 78px/1.15 'Dancing Script', cursive;
+  background: linear-gradient(100deg, #f97316, var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.word.sm span { font-size: 54px; }
+.word.sm svg { width: 34px; height: 34px; }
+.write { clip-path: inset(0 100% 0 0); animation: write 6s ease-in-out infinite; }
+@keyframes write {
+  0% { clip-path: inset(0 100% 0 0); opacity: 1; }
+  55%, 88% { clip-path: inset(0 0 0 0); opacity: 1; }
+  100% { clip-path: inset(0 0 0 0); opacity: 0; }
+}
+
+.body { position: relative; z-index: 2; display: grid; justify-items: center; gap: 12px; max-width: 520px; text-align: center; }
+h1 { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 650; letter-spacing: -0.02em; }
+.sub { margin: 0; max-width: 440px; color: var(--muted); }
+.sub a { color: var(--accent); font-weight: 500; text-underline-offset: 3px; }
+.en { margin: 6px 0 0; font-size: 13px; color: var(--muted); opacity: 0.85; }
+
+/* Mini visuels Power BI qui flottent autour du texte, sans jamais passer dessus */
+.tiles { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.tile { position: absolute; left: var(--x); top: var(--y); rotate: var(--r); animation: float 9s ease-in-out infinite alternate; animation-delay: var(--d); }
+@keyframes float { from { translate: 0 -10px; } to { translate: 6px 14px; } }
+.card { width: 178px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 30px rgba(28, 49, 81, 0.13); }
+.card b { display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.card .v { white-space: nowrap; font-size: 22px; font-weight: 750; letter-spacing: -0.02em; }
+.card .d { font-size: 11px; font-weight: 600; color: var(--ok); }
+.card svg { display: block; width: 100%; height: auto; }
+.card.nav { width: 120px; background: var(--navy); border-color: var(--navy); }
+.card.nav i { display: block; height: 9px; margin: 8px 0; border-radius: 5px; background: rgba(255, 255, 255, 0.22); }
+.card.nav i.on { background: var(--accent); width: 80%; }
+.card.pill { width: auto; white-space: nowrap; padding: 9px 12px; border-radius: 999px; font-size: 12px; color: var(--muted); }
+
+@media (max-width: 1180px) { .mid { display: none; } }
+@media (max-width: 760px) {
+  .wide { display: none; }
+  .tile { left: var(--mx); top: var(--my); }
+  .card { width: 140px; padding: 10px 12px; }
+  .card .v { font-size: 17px; }
+  .word span { font-size: 58px; }
+  .word svg { width: 36px; height: 36px; }
+  h1 { font-size: 23px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .write { clip-path: none; animation: none; opacity: 1; }
+  .tile { animation: none; }
+}
+
+/* Accès réservé */
+.panel { position: relative; z-index: 2; width: min(420px, 100%); display: grid; justify-items: center; gap: 10px; padding: 30px 26px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.14); text-align: center; }
+.panel h1 { font-size: 22px; }
+form { width: 100%; display: grid; gap: 8px; margin-top: 8px; text-align: left; }
+label { font-size: 13px; font-weight: 500; }
+.row { display: flex; gap: 8px; }
+input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: inherit; }
+input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); border-color: var(--accent); }
+button { height: 42px; padding: 0 18px; border: 0; border-radius: 10px; background: #c2410c; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+button:hover { background: #9a3412; }
+.err { margin: 2px 0 0; color: var(--accent-2); font-size: 13px; }

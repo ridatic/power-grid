@@ -71,6 +71,8 @@ venv/
 .env
 .env.*
 !.env.example
+.dev.vars
+.wrangler/
 *.pfx
 *.p12
 *.pem
